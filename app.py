@@ -81,24 +81,29 @@ def render_calendar(month, year):
 if not st.session_state.logged_in and not st.session_state.change_password_mode:
     st.markdown("""
         <style>
-            .centered-form {
-                display: flex;
-                flex-direction: column;
-                align-items: center;
-                justify-content: center;
-                height: 70vh;
-            }
-            .stTextInput>div>input {
-                text-align: center;
-            }
+        body {
+            background-image: url('https://tse3.mm.bing.net/th/id/OIP.GOHhj0xvqIbQ0jdftMfaKwHaFj');
+            background-size: cover;
+            background-position: center;
+            background-attachment: fixed;
+        }
+        .block-container {
+            background-color: rgba(255, 255, 255, 0.85);
+            padding: 2rem;
+            border-radius: 12px;
+            max-width: 400px;
+            margin: auto;
+            margin-top: 12vh;
+        }
         </style>
     """, unsafe_allow_html=True)
 
-    st.markdown("<h1 style='text-align: center;'>Meu Perito</h1>", unsafe_allow_html=True)
-    with st.container():
-        st.text_input("Email (ou nome de utilizador)", key="user")
-        st.text_input("Senha", type="password", key="pwd")
-        st.button("Entrar", on_click=login)
+    st.markdown("<div class='block-container'>", unsafe_allow_html=True)
+    st.markdown("<h2 style='text-align: center;'>Meu Perito</h2>", unsafe_allow_html=True)
+    st.text_input("Email (ou nome de utilizador)", key="user")
+    st.text_input("Senha", type="password", key="pwd")
+    st.button("Entrar", on_click=login)
+    st.markdown("</div>", unsafe_allow_html=True)
     st.stop()
 
 # --- FORÇA TROCA DE SENHA NO PRIMEIRO LOGIN ---
