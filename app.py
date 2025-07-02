@@ -1,6 +1,6 @@
 # Sistema de Gestão de Laudos Periciais
-# Versão 3.0.2: Reverte a manipulação da chave privada para confiar no formato TOML.
-# Objetivo: Corrigir o erro "item assignment" de forma definitiva.
+# Versão 3.1: Implementa o uso de credenciais Firebase codificadas em Base64.
+# Objetivo: Corrigir de forma definitiva os erros de formatação da chave privada.
 
 import streamlit as st
 import google.generativeai as genai
@@ -9,19 +9,23 @@ from io import BytesIO
 import datetime
 import firebase_admin
 from firebase_admin import credentials, firestore
+import base64
+import json
 
 # --- 1. CONFIGURAÇÃO DO FIREBASE ---
 def init_firestore():
-    """Inicializa e retorna o cliente do Firestore."""
+    """Inicializa e retorna o cliente do Firestore usando credenciais Base64."""
     if not firebase_admin._apps:
         try:
-            # A linha que manipulava a chave foi removida.
-            # Agora confiamos 100% no formato dos Segredos do Streamlit.
-            creds_dict = st.secrets["firebase_credentials"]
+            # Descodifica a string Base64 para obter o dicionário de credenciais
+            creds_base64 = st.secrets["FIREBASE_CREDENTIALS_BASE64"]
+            creds_json_str = base64.b64decode(creds_base64).decode("utf-8")
+            creds_dict = json.loads(creds_json_str)
+            
             creds = credentials.Certificate(creds_dict)
             firebase_admin.initialize_app(creds)
         except Exception as e:
-            st.error(f"Erro ao inicializar o Firebase. Verifique suas credenciais nos Segredos do Streamlit: {e}")
+            st.error(f"Erro ao inicializar o Firebase a partir das credenciais Base64. Verifique os seus Segredos: {e}")
             return None
     return firestore.client()
 
