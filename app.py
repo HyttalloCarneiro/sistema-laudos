@@ -1,5 +1,5 @@
 # Meu Perito - Sistema de Gestão de Laudos
-# Versão 7.2.1: Adiciona salvamento de agendamento com local e data no Firestore
+# Versão 7.3: Exibe agendamentos salvos por usuário
 
 import streamlit as st
 import firebase_admin
@@ -12,7 +12,6 @@ import base64
 # --- 1. CONFIGURAÇÃO E INICIALIZAÇÃO ---
 
 def init_firebase():
-    """Inicializa o Firebase Admin SDK se ainda não foi inicializado."""
     if not firebase_admin._apps:
         try:
             creds_base64 = st.secrets["FIREBASE_CREDENTIALS_BASE64"]
@@ -21,14 +20,13 @@ def init_firebase():
             creds = credentials.Certificate(creds_dict)
             firebase_admin.initialize_app(creds)
         except Exception as e:
-            st.error(f"Erro ao inicializar o Firebase: {e}")
+            st.error(f"Erro ao inicializar Firebase: {e}")
             st.stop()
     return firestore.client()
 
 # --- 2. AUTENTICAÇÃO ---
 
 def sign_in(email, password):
-    """Autentica um usuário com Firebase."""
     api_key = st.secrets["FIREBASE_WEB_API_KEY"]
     url = f"https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key={api_key}"
     payload = json.dumps({"email": email, "password": password, "returnSecureToken": True})
@@ -90,10 +88,9 @@ def register_user(email, password, display_name, role='Assistente'):
         st.error(f"Erro ao criar usuário: {e}")
         return False
 
-# --- 3. SALVAR AGENDAMENTO ---
+# --- 3. FUNÇÕES DE AGENDA ---
 
 def salvar_agendamento(uid, local, data):
-    """Salva o agendamento da perícia no Firestore."""
     try:
         db = init_firebase()
         agendamento = {
@@ -108,7 +105,24 @@ def salvar_agendamento(uid, local, data):
         st.error(f"Erro ao salvar agendamento: {e}")
         return False
 
-# --- 4. TELAS DO SISTEMA ---
+def carregar_agendamentos(uid):
+    try:
+        db = init_firebase()
+        agendamentos_ref = db.collection("agendamentos").where("usuario_id", "==", uid).order_by("data")
+        docs = agendamentos_ref.stream()
+        dados = []
+        for doc in docs:
+            d = doc.to_dict()
+            dados.append({
+                "Data da Perícia": d.get("data"),
+                "Local": d.get("local"),
+            })
+        return dados
+    except Exception as e:
+        st.error(f"Erro ao carregar agendamentos: {e}")
+        return []
+
+# --- 4. TELAS ---
 
 def render_login_screen():
     st.set_page_config(layout="centered")
@@ -118,12 +132,11 @@ def render_login_screen():
         </style>
         <h1 class="title">Meu Perito</h1>
     """, unsafe_allow_html=True)
-    
+
     with st.form("login_form"):
         email = st.text_input("Email")
         password = st.text_input("Senha", type="password")
         submitted = st.form_submit_button("Entrar")
-
         if submitted:
             user_info = sign_in(email, password)
             if user_info:
@@ -168,14 +181,13 @@ def render_main_app():
             for key in list(st.session_state.keys()):
                 del st.session_state[key]
             st.rerun()
-    
+
     st.divider()
 
     if st.session_state.user_role == 'Administrador':
         with st.expander("Painel de Administração"):
             st.subheader("Gestão de Usuários")
             with st.form("create_user_form", clear_on_submit=True):
-                st.write("**Criar Novo Usuário (Assistente)**")
                 col_a, col_b, col_c = st.columns([2,2,1])
                 new_email = col_a.text_input("Email")
                 new_name = col_b.text_input("Nome")
@@ -184,7 +196,6 @@ def render_main_app():
                         register_user(new_email, "123456", new_name)
                     else:
                         st.warning("Preencha o email e o nome.")
-            st.divider()
 
     if 'view' not in st.session_state:
         st.session_state.view = 'home'
@@ -199,19 +210,27 @@ def render_main_app():
         st.header("Agendamento da Perícia")
 
         local_escolhido = "17ª Vara Federal - Juazeiro"
-        selected_date = st.date_input("📅 Data da perícia:", datetime.date.today(), format="DD/MM/YYYY")
+        selected_date = st.date_input("\U0001F4C5 Data da perícia:", datetime.date.today(), format="DD/MM/YYYY")
 
-        if st.button("✅ Confirmar Agendamento", use_container_width=True):
+        if st.button("\u2705 Confirmar Agendamento", use_container_width=True):
             if salvar_agendamento(st.session_state.uid, local_escolhido, selected_date):
                 st.success(f"Agendamento salvo com sucesso para {selected_date.strftime('%d/%m/%Y')} no local: {local_escolhido}")
             else:
                 st.error("Erro ao salvar o agendamento.")
 
-        if st.button("🔙 Voltar"):
+        if st.button("\U0001F519 Voltar"):
             st.session_state.view = 'home'
             st.rerun()
 
-# --- 5. INÍCIO DO APLICATIVO ---
+        st.divider()
+        st.subheader("Agendamentos Salvos")
+        dados = carregar_agendamentos(st.session_state.uid)
+        if dados:
+            st.dataframe(dados, use_container_width=True)
+        else:
+            st.info("Nenhum agendamento encontrado.")
+
+# --- INÍCIO DO APP ---
 
 if 'logged_in' not in st.session_state:
     st.session_state.logged_in = False
