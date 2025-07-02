@@ -9,6 +9,7 @@ from firebase_admin import credentials, firestore, auth
 import datetime
 import requests
 import json
+import base64
 
 # --- 1. CONFIGURAÇÃO E INICIALIZAÇÃO ---
 
@@ -16,6 +17,7 @@ def init_firebase():
     """Inicializa o Firebase Admin SDK se ainda não foi inicializado."""
     if not firebase_admin._apps:
         try:
+            # Usa o método Base64 que é mais robusto
             creds_base64 = st.secrets["FIREBASE_CREDENTIALS_BASE64"]
             creds_json_str = base64.b64decode(creds_base64).decode("utf-8")
             creds_dict = json.loads(creds_json_str)
@@ -68,20 +70,26 @@ def change_password(id_token, new_password):
 def get_user_data(uid):
     """Obtém os dados de um utilizador (perfil, etc.) do Firestore."""
     db = init_firestore()
-    user_doc = db.collection('users').document(uid).get()
+    user_doc_ref = db.collection('users').document(uid)
+    user_doc = user_doc_ref.get()
+    
     if user_doc.exists:
         return user_doc.to_dict()
     
     # Se o documento não existir (ex: primeiro login do admin), cria-o
-    user_record = auth.get_user(uid)
-    user_data = {
-        'email': user_record.email,
-        'display_name': user_record.display_name or 'Administrador',
-        'role': 'Administrador', # Assume que o primeiro utilizador é admin
-        'first_login': True
-    }
-    db.collection('users').document(uid).set(user_data)
-    return user_data
+    try:
+        user_record = auth.get_user(uid)
+        user_data = {
+            'email': user_record.email,
+            'display_name': user_record.display_name or 'Administrador',
+            'role': 'Administrador', # Assume que o primeiro utilizador é admin
+            'first_login': True
+        }
+        user_doc_ref.set(user_data)
+        return user_data
+    except Exception as e:
+        st.error(f"Não foi possível obter os dados do novo utilizador: {e}")
+        return None
 
 # --- 3. TELAS DA APLICAÇÃO ---
 
@@ -107,11 +115,11 @@ def render_login_screen():
                 st.session_state.id_token = user_info['idToken']
                 
                 user_data = get_user_data(st.session_state.uid)
-                st.session_state.user_name = user_data.get('display_name', 'Utilizador')
-                st.session_state.user_role = user_data.get('role', 'Assistente')
-                st.session_state.force_password_change = user_data.get('first_login', False)
-                
-                st.rerun()
+                if user_data:
+                    st.session_state.user_name = user_data.get('display_name', 'Utilizador')
+                    st.session_state.user_role = user_data.get('role', 'Assistente')
+                    st.session_state.force_password_change = user_data.get('first_login', False)
+                    st.rerun()
 
 def render_password_change_screen():
     st.title("Bem-vindo ao Meu Perito!")
