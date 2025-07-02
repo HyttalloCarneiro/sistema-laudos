@@ -8,7 +8,7 @@ st.set_page_config(page_title="Meu Perito", layout="wide")
 # --- DADOS EM MEMÓRIA (temporários) ---
 DEMO_USERS = {
     "dr.hyttallo": {"password": "admin123", "role": "admin", "first_login": False},
-    "assistente1": {"password": "assist123", "role": "assistant", "first_login": False},
+    "assistente1": {"password": "assist123", "role": "assistant", "first_login": True},
     "hc.periciamedica@hotmail.com": {"password": "admin123", "role": "admin", "first_login": False},
 }
 
