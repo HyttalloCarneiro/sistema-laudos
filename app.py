@@ -1,51 +1,34 @@
-# Módulo 7: Modelos de Laudo (Padrão vs. 17ª Vara)
-# Versão 2.3.1: Refatoração do código para corrigir erro de execução.
-# Objetivo: Simplificar a estrutura interna do código para garantir a estabilidade
-# na plataforma Streamlit Cloud, mantendo a funcionalidade de laudo sequencial.
+# Sistema de Gestão de Laudos Periciais
+# Versão 3.0: Implementação da estrutura de navegação em árvore e banco de dados.
+# Objetivo: Transformar o aplicativo em um sistema de gestão completo, permitindo
+# a organização de perícias por local e data, com armazenamento persistente.
 
 import streamlit as st
 import google.generativeai as genai
 import PyPDF2
 from io import BytesIO
+import datetime
+import firebase_admin
+from firebase_admin import credentials, firestore
 
-# --- 2. Constantes e Textos Fixos ---
-QUESITOS_JUIZ_17_VARA = """
-1) A parte autora é portadora de alguma doença ou sequela? Qual a doença ou sequela e desde quando (data precisa ou pelo menos aproximada)?
-2) Se positiva a resposta anterior, tal doença ou sequela o(a) incapacita para o exercício de atividade laborativa? Qual a data do início da incapacidade (data precisa ou pelo menos aproximada)?
-3) Se positiva a resposta anterior, trata-se de incapacidade temporária ou definitiva? A doença incapacitante é reversível, levando em conta a idade e condições socioeconômicas do periciando?
-4) Caso o(a) periciando(a) seja criança ou adolescente, até dezesseis anos de idade, há limitação do desempenho de atividade e restrição da participação social, compatível com a idade?
-5) Havendo incapacidade, esclareça o Sr. Perito se a incapacidade para o trabalho abrange qualquer atividade laborativa.
-6) Havendo incapacidade, a parte autora (pericianda) necessita da assistência permanente de outra pessoa?
-7) Preste o Sr. Perito os esclarecimentos adicionais que considerar necessários.
-"""
-QUESITOS_REU_INSS = """
-SOBRE A IDENTIFICAÇÃO DO PERICIANDO E DO PERITO:
-1) Quais os documentos de identificação com foto (RG, Carteira de Motorista, Carteira Profissional etc.) que foram apresentados ao Sr. Perito, para se comprovar que de fato o autor da ação é aquele que se apresenta para a realização da Perícia Médica?
-2) O Periciando possui algum grau de parentesco ou já foi atendido anteriormente pelo Sr. Perito? Se há grau de parentesco, qual?
-SOBRE A EXISTÊNCIA DE EVENTUAL ENFERMIDADE (DOENÇA):
-3) Quais os sintomas, os sinais e os exames realizados que comprovam o diagnóstico?
-SOBRE A EXISTÊNCIA DE EVENTUAL INCAPACIDADE LABORATIVA:
-4) Em caso de incapacidade, informe o Sr. Perito se ela é PERMANENTE ou TEMPORÁRIA. (...)
-5) Em caso de incapacidade, ela é para qualquer atividade física e laborativa (INCAPACIDADE TOTAL) ou somente para algumas atividades laborais (INCAPACIDADE PARCIAL)? (...)
-6) Na época da cessação/indeferimento (DCB/DER) do benefício na esfera administrativa, o autor apresentava o mesmo estado atual? (...)
-7) Havendo incapacidade, o autor estaria apto a submeter-se a REABILITAÇÃO profissional para o exercício de outras atividades que lhe garantissem a subsistência? (...)
-8) Há NEXO CAUSAL entre a enfermidade/lesão constatada e a atividade profissional do autor? (...)
-9) Indique o expert judicial OUTRAS CONSIDERAÇÕES que entender necessárias e complementares ao caso em foco.
-"""
-RESPOSTA_PADRAO_JUIZ_4 = "Quesito prejudicado, tendo em vista que o(a) periciando(a) é maior de idade."
-RESPOSTA_JUIZ_5_PREJUDICADO = "Prejudicado, não reconhecida incapacidade laboral da parte autora."
-RESPOSTA_PADRAO_JUIZ_6_NAO = "Não foi constatada a necessidade de assistência permanente de outra pessoa."
-RESPOSTA_PADRAO_JUIZ_6_SIM = "Sim, foi constatada a necessidade de assistência permanente de outra pessoa."
-RESPOSTA_PADRAO_JUIZ_7 = "Demais esclarecimentos prestados no tópico discursivo e demais quesitos do presente laudo."
-RESPOSTA_PADRAO_REU_1 = "Identificado por documento civil exposto na apresentação deste laudo."
-RESPOSTA_PADRAO_REU_2 = "Não, para ambas indagações."
-RESPOSTA_PADRAO_REU_9 = "Demais considerações prestadas no tópico discursivo e demais quesitos do presente laudo."
-RESPOSTA_INCAPACIDADE_TOTAL = "Reconheço a incapacidade como omniprofissional."
-RESPOSTA_INCAPACIDADE_UNIPROFISSIONAL = "Reconheço a incapacidade como uniprofissional, exclusivamente para o exercício de sua atividade habitual."
-TEMPLATE_INCAPACIDADE_PARCIAL = "Reconheço a incapacidade como multiprofissional, abrangendo sua função, qual seja '{funcao}' e demais atividades que demandem '{restricao}'."
+# --- 1. CONFIGURAÇÃO DO FIREBASE ---
+# Esta função inicializa a conexão com o banco de dados Firestore.
+# Ela usa as credenciais armazenadas de forma segura nos "Secrets" do Streamlit.
+def init_firestore():
+    """Inicializa e retorna o cliente do Firestore."""
+    if not firebase_admin._apps:
+        try:
+            creds_dict = st.secrets["firebase_credentials"]
+            creds = credentials.Certificate(creds_dict)
+            firebase_admin.initialize_app(creds)
+        except Exception as e:
+            st.error(f"Erro ao inicializar o Firebase. Verifique suas credenciais nos Segredos do Streamlit: {e}")
+            return None
+    return firestore.client()
 
-# --- 3. Funções Auxiliares ---
+# --- 2. FUNÇÕES AUXILIARES ---
 def extrair_texto_de_pdf(arquivo_pdf_bytes):
+    # (Mesma função das versões anteriores)
     try:
         arquivo_em_memoria = BytesIO(arquivo_pdf_bytes)
         leitor_pdf = PyPDF2.PdfReader(arquivo_em_memoria)
@@ -55,153 +38,149 @@ def extrair_texto_de_pdf(arquivo_pdf_bytes):
             if texto_extraido:
                 texto_completo += texto_extraido + "\n"
         return texto_completo
-    except Exception as e:
-        st.error(f"Erro ao ler o ficheiro PDF: {e}")
+    except Exception:
         return None
 
-# --- 4. Interface do Utilizador (Streamlit) ---
-st.set_page_config(page_title="Gerador de Laudos Automatizado", layout="wide")
-st.title("🤖 Assistente para Geração de Laudos Médicos v2.3")
+# --- 3. LÓGICA DE NAVEGAÇÃO (TELAS) ---
 
-# --- Coluna de Configuração (Esquerda) ---
-with st.sidebar:
-    st.header("1. Definição da Conclusão")
-    resultado_conclusao = st.radio(
-        "Resultado da Perícia:",
-        ("Incapacidade Reconhecida", "Incapacidade Não Reconhecida"),
-        key="resultado_conclusao"
-    )
-
-    natureza_incapacidade, duracao_meses, tipo_abrangencia, funcao_autor_parcial, restricao_autor, profissao_uniprofissional_manual = "", 0, None, "", "", ""
-    if resultado_conclusao == "Incapacidade Reconhecida":
-        natureza_incapacidade = st.radio("Natureza da Incapacidade:", ("Temporária", "Permanente"))
-        if natureza_incapacidade == "Temporária":
-            duracao_meses = st.number_input("Duração da incapacidade (meses):", min_value=1, value=6)
-        
-        tipo_abrangencia = st.radio(
-            "Abrangência da incapacidade (Quesito 5 do Juiz):",
-            ("Incapacidade Total (Omniprofissional)", "Incapacidade Parcial (Multiprofissional)", "Incapacidade Uniprofissional"),
-            key="tipo_abrangencia"
-        )
-        if tipo_abrangencia == "Incapacidade Parcial (Multiprofissional)":
-            funcao_autor_parcial = st.text_input("Função do autor:", placeholder="Ex: Agricultor(a)")
-            restricao_autor = st.text_input("Restrição do autor:", placeholder="Ex: esforço físico")
-        elif tipo_abrangencia == "Incapacidade Uniprofissional":
-            profissao_uniprofissional_manual = st.text_input("Substituir profissão (opcional):", placeholder="Ex: Doméstica")
-
-    st.divider()
-
-    st.header("2. Respostas Padrão Adicionais")
-    periciando_adulto = st.checkbox("Periciando é adulto (Quesito 4 do Juiz)?", value=True)
-    if resultado_conclusao == "Incapacidade Reconhecida":
-        assistencia_permanente = st.checkbox("Necessita de assistência permanente (Quesito 6 do Juiz)?", value=False)
-    else:
-        assistencia_permanente = False
-
-    st.divider()
+def render_home():
+    """Tela inicial para seleção do local da perícia."""
+    st.title("Sistema de Gestão de Laudos Periciais")
+    st.header("Selecione o Local da Perícia")
     
-    st.header("3. Configurações e Upload")
-    google_api_key = st.secrets.get("GOOGLE_API_KEY") or st.text_input("Insira a sua Chave de API do Google AI", type="password")
-    uploaded_file = st.file_uploader("Faça o upload do documento (PDF)", type="pdf")
+    # No futuro, podemos carregar os locais do banco de dados.
+    # Por enquanto, temos apenas um local fixo.
+    if st.button("17ª Vara Federal - Juazeiro", use_container_width=True):
+        st.session_state.view = 'date_selection'
+        st.session_state.location_id = '17a_vara_juazeiro'
+        st.session_state.location_name = '17ª Vara Federal - Juazeiro'
+        st.rerun()
 
-# --- Lógica Principal ---
-def gerar_laudo_completo():
-    try:
-        with st.spinner("A processar o laudo... Por favor, aguarde."):
-            # --- Etapa 1: Configuração e Extração de Texto ---
-            genai.configure(api_key=google_api_key)
-            texto_documento = extrair_texto_de_pdf(uploaded_file.getvalue())
-            if not texto_documento:
-                st.error("Não foi possível extrair texto do PDF.")
-                return
+def render_date_selection():
+    """Tela para seleção da data das perícias."""
+    st.title(st.session_state.location_name)
+    
+    selected_date = st.date_input(
+        "Selecione a data das perícias:",
+        datetime.date.today(),
+        format="DD/MM/YYYY"
+    )
+    
+    col1, col2 = st.columns([1, 0.2])
+    with col1:
+        if st.button("Confirmar Data e Ver Processos", use_container_width=True):
+            st.session_state.view = 'process_list'
+            st.session_state.selected_date = selected_date.strftime("%Y-%m-%d")
+            st.rerun()
+    with col2:
+        if st.button("Voltar", use_container_width=True):
+            st.session_state.view = 'home'
+            st.rerun()
 
-            model = genai.GenerativeModel('gemini-1.5-pro-latest')
+def render_process_list():
+    """Tela para listar e gerir os processos de uma data específica."""
+    db = init_firestore()
+    if not db: return
 
-            # --- Etapa 2: Extrair Quesitos do Autor ---
-            prompt_extracao_autor = f"Analise o texto completo do processo a seguir. Localize a seção de 'Quesitos da Parte Autora'. Se encontrar quesitos e não houver indicação de que foram indeferidos, extraia e liste APENAS os quesitos, numerados. Se não houver quesitos da parte autora ou se foram indeferidos, responda APENAS com a palavra 'NENHUM'.\n\nTEXTO:\n{texto_documento}"
-            response_autor = model.generate_content(prompt_extracao_autor)
-            quesitos_autor_extraidos = response_autor.text.strip()
+    st.title(f"Processos para {st.session_state.selected_date}")
+    st.subheader(f"Local: {st.session_state.location_name}")
+    
+    # Formulário para adicionar um novo processo
+    with st.form("add_process_form", clear_on_submit=True):
+        st.write("**Adicionar Novo Processo**")
+        col1, col2, col3 = st.columns([2, 2, 1])
+        with col1:
+            process_number = st.text_input("Número do Processo")
+        with col2:
+            author_name = st.text_input("Nome da Parte Autora")
+        with col3:
+            st.write("") # Espaçamento
+            st.write("") # Espaçamento
+            submitted = st.form_submit_button("Adicionar")
+    
+    if submitted and process_number and author_name:
+        # Adiciona o novo processo ao Firestore
+        process_data = {
+            "number": process_number,
+            "author": author_name,
+            "status": "Pendente",
+            "pdf_uploaded": False
+        }
+        db.collection("locations").document(st.session_state.location_id)\
+          .collection("schedules").document(st.session_state.selected_date)\
+          .collection("processes").add(process_data)
+        st.success(f"Processo de {author_name} adicionado com sucesso!")
 
-            # --- Etapa 3: Construir Conclusão e Instruções ---
-            if resultado_conclusao == "Incapacidade Não Reconhecida":
-                conclusao_texto = "Diante do exposto na análise pericial, não foi constatada a existência de incapacidade laboral para a parte autora."
-            else:
-                conclusao_texto = f"Diante do exposto na análise pericial, foi constatada a existência de incapacidade laboral de natureza {natureza_incapacidade.lower()}"
-                conclusao_texto += f", com prazo de recuperação estimado em {duracao_meses} meses." if natureza_incapacidade == "Temporária" else "."
+    st.divider()
 
-            instrucoes_juiz = [f"Para o quesito 7, use a resposta: '{RESPOSTA_PADRAO_JUIZ_7}'."]
-            if periciando_adulto:
-                instrucoes_juiz.append(f"Para o quesito 4, use a resposta: '{RESPOSTA_PADRAO_JUIZ_4}'.")
-            
-            if resultado_conclusao == "Incapacidade Não Reconhecida":
-                instrucoes_juiz.append(f"Para o quesito 5, use a resposta: '{RESPOSTA_JUIZ_5_PREJUDICADO}'.")
-                instrucoes_juiz.append(f"Para o quesito 6, use a resposta: '{RESPOSTA_JUIZ_5_PREJUDICADO}'.")
-            else:
-                instrucoes_juiz.append(f"Para o quesito 6, use a resposta: '{RESPOSTA_PADRAO_JUIZ_6_SIM if assistencia_permanente else RESPOSTA_PADRAO_JUIZ_6_NAO}'.")
-                if tipo_abrangencia == "Incapacidade Total (Omniprofissional)":
-                    instrucoes_juiz.append(f"Para o quesito 5, use a resposta: '{RESPOSTA_INCAPACIDADE_TOTAL}'.")
-                elif tipo_abrangencia == "Incapacidade Uniprofissional":
-                    instrucoes_juiz.append(f"Para o quesito 5, use a resposta: '{RESPOSTA_INCAPACIDADE_UNIPROFISSIONAL}'.")
-                elif tipo_abrangencia == "Incapacidade Parcial (Multiprofissional)":
-                    resposta_parcial = TEMPLATE_INCAPACIDADE_PARCIAL.format(funcao=funcao_autor_parcial, restricao=restricao_autor)
-                    instrucoes_juiz.append(f"Para o quesito 5, use a resposta: '{resposta_parcial}'.")
+    # Exibir a lista de processos
+    st.header("Lista de Perícias Agendadas")
+    processes_ref = db.collection("locations").document(st.session_state.location_id)\
+                      .collection("schedules").document(st.session_state.selected_date)\
+                      .collection("processes").stream()
+    
+    processes = [proc for proc in processes_ref]
 
-            instrucoes_reu = [
-                f"Para o quesito 1, use a resposta: '{RESPOSTA_PADRAO_REU_1}'.",
-                f"Para o quesito 2, use a resposta: '{RESPOSTA_PADRAO_REU_2}'.",
-                f"Para o quesito 9, use a resposta: '{RESPOSTA_PADRAO_REU_9}'."
-            ]
-
-            secao_autor = "### RESPOSTA AOS QUESITOS DA PARTE AUTORA\n\nNão foram apresentados quesitos pela parte autora ou os mesmos foram indeferidos."
-            if quesitos_autor_extraidos.upper() != 'NENHUM':
-                secao_autor = f"### RESPOSTA AOS QUESITOS DA PARTE AUTORA\nResponda aos seguintes quesitos da parte autora, que foram extraídos do documento, baseando-se no mesmo documento de referência.\n\nQuesitos do Autor:\n---\n{quesitos_autor_extraidos}\n---"
-
-            # --- Etapa 4: Montar o Prompt Final e Gerar ---
-            prompt_final = f"""
-            Você é um assistente especialista em laudos periciais. A sua tarefa é estruturar um laudo completo com as seções abaixo, seguindo as instruções rigorosamente.
-
-            ### CONCLUSÃO
-            {conclusao_texto}
-
-            ### RESPOSTA AOS QUESITOS DO JUÍZO
-            Responda aos quesitos do juízo abaixo.
-            **Instruções Especiais para os Quesitos do Juízo:**
-            {chr(10).join(f'- {inst}' for inst in instrucoes_juiz)}
-            - Para os demais quesitos, baseie-se no documento de referência.
-            **Quesitos do Juízo:**
-            ---
-            {QUESITOS_JUIZ_17_VARA}
-            ---
-
-            {secao_autor}
-
-            ### RESPOSTA AOS QUESITOS DO RÉU
-            Responda aos quesitos do réu abaixo.
-            **Instruções Especiais para os Quesitos do Réu:**
-            {chr(10).join(f'- {inst}' for inst in instrucoes_reu)}
-            - Para os demais quesitos, baseie-se no documento de referência.
-            **Quesitos do Réu:**
-            ---
-            {QUESITOS_REU_INSS}
-            ---
-
-            **Documento de Referência para Análise:**
-            ---
-            {texto_documento}
-            ---
-            """
-            response = model.generate_content(prompt_final)
-            
-            st.success("Laudo gerado com sucesso!")
-            st.markdown("---")
-            st.header("Resultado da Análise")
-            st.markdown(response.text)
-
-    except Exception as e:
-        st.error(f"Ocorreu um erro durante a geração do laudo: {e}")
-
-if st.button("Gerar Laudo Completo"):
-    if not google_api_key or not uploaded_file:
-        st.warning("Por favor, insira a chave de API e faça o upload de um ficheiro PDF.")
+    if not processes:
+        st.info("Nenhum processo agendado para esta data. Adicione um processo acima.")
     else:
-        gerar_laudo_completo()
+        for proc in processes:
+            proc_data = proc.to_dict()
+            with st.container(border=True):
+                col1, col2, col3 = st.columns([2, 1, 1])
+                with col1:
+                    st.write(f"**Autor(a):** {proc_data.get('author')}")
+                    st.write(f"**Processo:** {proc_data.get('number')}")
+                with col2:
+                    # O file_uploader precisa de uma chave única para cada processo
+                    uploaded_file = st.file_uploader(
+                        "Carregar PDF", 
+                        type="pdf", 
+                        key=f"uploader_{proc.id}"
+                    )
+                    if uploaded_file:
+                        # Aqui você pode adicionar a lógica para salvar o PDF (versões futuras)
+                        st.success(f"PDF '{uploaded_file.name}' carregado!")
+                with col3:
+                    if st.button("Gerar Laudo", key=f"laudo_{proc.id}", use_container_width=True):
+                        st.session_state.view = 'laudo_generation'
+                        st.session_state.selected_process_id = proc.id
+                        st.session_state.selected_process_data = proc_data
+                        st.rerun()
+
+    if st.button("Voltar para o Calendário"):
+        st.session_state.view = 'date_selection'
+        st.rerun()
+
+def render_laudo_generation():
+    """Tela para gerar o laudo, similar à v2.3."""
+    st.title("Geração de Laudo")
+    proc_data = st.session_state.selected_process_data
+    st.subheader(f"Analisando: {proc_data.get('author')} - Proc. {proc_data.get('number')}")
+    
+    # A partir daqui, o código é muito similar ao da v2.3, mas está encapsulado
+    # nesta função e opera sobre o processo selecionado.
+    # Por simplicidade, vamos colocar um placeholder por enquanto.
+    st.info("A interface de geração de laudo que você já conhece aparecerá aqui.")
+    st.write("As configurações da barra lateral e a lógica de geração do laudo serão integradas nesta tela.")
+    
+    if st.button("Voltar para a Lista de Processos"):
+        st.session_state.view = 'process_list'
+        st.rerun()
+
+# --- PONTO DE ENTRADA PRINCIPAL ---
+if 'view' not in st.session_state:
+    st.session_state.view = 'home'
+
+# Renderiza a tela atual com base no estado da sessão
+if st.session_state.view == 'home':
+    render_home()
+elif st.session_state.view == 'date_selection':
+    render_date_selection()
+elif st.session_state.view == 'process_list':
+    render_process_list()
+elif st.session_state.view == 'laudo_generation':
+    render_laudo_generation()
+else:
+    st.session_state.view = 'home' # Padrão de segurança
+    st.rerun()
