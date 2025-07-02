@@ -2,13 +2,14 @@ import streamlit as st
 import datetime
 import uuid
 import calendar
+from PIL import Image
 
 st.set_page_config(page_title="Meu Perito", layout="wide")
 
 # --- DADOS EM MEMÓRIA (temporários) ---
 DEMO_USERS = {
-    "dr.hyttallo": {"password": "admin123", "role": "admin", "first_login": False},
-    "assistente1": {"password": "assist123", "role": "assistant", "first_login": True},
+    "hyttallocarneiro": {"password": "admin123", "role": "admin", "first_login": False},
+    "pauloramone": {"password": "paulo123", "role": "assistant", "first_login": True},
     "hc.periciamedica@hotmail.com": {"password": "admin123", "role": "admin", "first_login": False},
 }
 
@@ -32,6 +33,8 @@ if "appointments" not in st.session_state:
     st.session_state.appointments = []
 if "change_password_mode" not in st.session_state:
     st.session_state.change_password_mode = False
+if "menu_option" not in st.session_state:
+    st.session_state.menu_option = None
 
 # --- FUNÇÕES ---
 def login():
@@ -77,33 +80,43 @@ def render_calendar(month, year):
                 if cols[i].button(str(day), key=f"day_{day}_{month}"):
                     st.session_state.selected_date = date_obj
 
-# --- TELA DE LOGIN OU TROCA DE SENHA INICIAL ---
-if not st.session_state.logged_in and not st.session_state.change_password_mode:
-    st.markdown("""
-        <style>
-        body {
-            background-image: url('https://tse3.mm.bing.net/th/id/OIP.GOHhj0xvqIbQ0jdftMfaKwHaFj');
-            background-size: cover;
-            background-position: center;
-            background-attachment: fixed;
-        }
-        .block-container {
-            background-color: rgba(255, 255, 255, 0.85);
-            padding: 2rem;
-            border-radius: 12px;
-            max-width: 400px;
-            margin: auto;
-            margin-top: 12vh;
-        }
-        </style>
-    """, unsafe_allow_html=True)
+# --- CSS PARA FUNDO E MENU TOPO ---
+st.markdown("""
+<style>
+body {
+    background-image: url('https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=1950&q=80');
+    background-size: cover;
+    background-position: center;
+}
+.login-box {
+    background-color: rgba(255,255,255,0.9);
+    padding: 2em;
+    border-radius: 10px;
+    width: 100%;
+    max-width: 400px;
+    margin: 5em auto;
+}
+.top-right-menu {
+    position: absolute;
+    top: 20px;
+    right: 30px;
+    background-color: #ffffffdd;
+    padding: 10px 15px;
+    border-radius: 8px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+}
+</style>
+""", unsafe_allow_html=True)
 
-    st.markdown("<div class='block-container'>", unsafe_allow_html=True)
-    st.markdown("<h2 style='text-align: center;'>Meu Perito</h2>", unsafe_allow_html=True)
-    st.text_input("Email (ou nome de utilizador)", key="user")
-    st.text_input("Senha", type="password", key="pwd")
-    st.button("Entrar", on_click=login)
-    st.markdown("</div>", unsafe_allow_html=True)
+# --- TELA DE LOGIN ---
+if not st.session_state.logged_in and not st.session_state.change_password_mode:
+    with st.container():
+        st.markdown("<div class='login-box'>", unsafe_allow_html=True)
+        st.title("Meu Perito")
+        st.text_input("Email (ou nome de utilizador)", key="user")
+        st.text_input("Senha", type="password", key="pwd")
+        st.button("Entrar", on_click=login)
+        st.markdown("</div>", unsafe_allow_html=True)
     st.stop()
 
 # --- FORÇA TROCA DE SENHA NO PRIMEIRO LOGIN ---
@@ -125,42 +138,43 @@ if st.session_state.change_password_mode:
                 st.error("Senha atual incorreta.")
     st.stop()
 
-# --- MENU LATERAL PÓS-LOGIN ---
-st.sidebar.title("👤 Usuário")
-st.sidebar.write(f"Bem-vindo, **{st.session_state.username}**")
-st.sidebar.write(f"Perfil: **{st.session_state.role}**")
-st.sidebar.button("Sair", on_click=logout)
+# --- MENU SUPERIOR DIREITO ---
+st.markdown("""
+<div class='top-right-menu'>
+<b>Usuário:</b> {user}<br>
+<small>perfil: {role}</small>
+</div>
+""".format(user=st.session_state.username, role=st.session_state.role), unsafe_allow_html=True)
 
-# --- ALTERAÇÃO DE SENHA MANUAL ---
-with st.sidebar.expander("🔒 Alterar senha"):
-    st.text_input("Senha atual", type="password", key="manual_old")
-    st.text_input("Nova senha", type="password", key="manual_new")
-    st.text_input("Confirmar nova senha", type="password", key="manual_confirm")
-    if st.button("Atualizar senha"):
-        if st.session_state.manual_new != st.session_state.manual_confirm:
-            st.sidebar.error("As senhas novas não coincidem.")
-        elif alterar_senha(st.session_state.username, st.session_state.manual_old, st.session_state.manual_new):
-            st.sidebar.success("Senha atualizada com sucesso!")
-        else:
-            st.sidebar.error("Senha atual incorreta.")
+option = st.selectbox("Selecionar ação", ["Cadastrar novo usuário", "Gerenciar usuários", "Alterar senha", "Sair"], key="menu_action")
 
-# --- CADASTRO DE NOVOS USUÁRIOS ---
-if st.session_state.role == "admin":
-    st.sidebar.markdown("---")
-    with st.sidebar.expander("👥 Cadastrar novo usuário"):
-        novo_usuario = st.text_input("Nome de usuário ou e-mail", key="novo_usuario")
-        nova_senha = st.text_input("Senha inicial", type="password", key="nova_senha")
-        novo_perfil = st.selectbox("Perfil", options=["assistant", "admin"], key="novo_perfil")
+if option == "Sair":
+    logout()
+elif option == "Alterar senha":
+    with st.form("manual_change_form"):
+        st.text_input("Senha atual", type="password", key="manual_old")
+        st.text_input("Nova senha", type="password", key="manual_new")
+        st.text_input("Confirmar nova senha", type="password", key="manual_confirm")
+        if st.form_submit_button("Atualizar senha"):
+            if st.session_state.manual_new != st.session_state.manual_confirm:
+                st.error("As senhas novas não coincidem.")
+            elif alterar_senha(st.session_state.username, st.session_state.manual_old, st.session_state.manual_new):
+                st.success("Senha atualizada com sucesso!")
+            else:
+                st.error("Senha atual incorreta.")
 
-        if st.button("Cadastrar usuário"):
-            if not novo_usuario or not nova_senha:
-                st.sidebar.error("Preencha todos os campos.")
-            elif novo_usuario in DEMO_USERS:
-                st.sidebar.error("Este usuário já está cadastrado.")
+elif option == "Cadastrar novo usuário" and st.session_state.role == "admin":
+    with st.form("cadastro_form"):
+        novo_usuario = st.text_input("Novo usuário (email ou nome de usuário)")
+        nova_senha = st.text_input("Senha inicial", type="password")
+        novo_perfil = st.selectbox("Perfil do novo usuário", ["admin", "assistant"])
+        if st.form_submit_button("Cadastrar"):
+            if novo_usuario in DEMO_USERS:
+                st.error("Usuário já existe.")
             else:
                 DEMO_USERS[novo_usuario] = {
                     "password": nova_senha,
                     "role": novo_perfil,
                     "first_login": True
                 }
-                st.sidebar.success(f"Usuário '{novo_usuario}' cadastrado com sucesso!")
+                st.success("Usuário cadastrado com sucesso!")
