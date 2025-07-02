@@ -1,5 +1,5 @@
 # Meu Perito - Sistema de Gestão de Laudos
-# Versão ajustada sem uso de locale.setlocale
+# Versão ajustada para evitar erros em campos de data ausentes
 
 import streamlit as st
 import firebase_admin
@@ -83,7 +83,12 @@ def render_calendar():
     db = init_firebase()
     agendamentos_ref = db.collection("agendamentos").where("usuario_id", "==", st.session_state["uid"])
     docs = agendamentos_ref.stream()
-    datas_agendadas = [doc.to_dict()["data"].date() for doc in docs]
+
+    datas_agendadas = []
+    for doc in docs:
+        dados = doc.to_dict()
+        if "data" in dados and hasattr(dados["data"], "date"):
+            datas_agendadas.append(dados["data"].date())
 
     cal = calendar.Calendar(firstweekday=0)
     semanas = cal.monthdatescalendar(ano, mes)
