@@ -107,7 +107,7 @@ def render_calendario():
             else:
                 data_str = dia.strftime("%Y-%m-%d")
                 marcado = "🔵" if data_str in datas_agendadas else ""
-                tabela += f"<td><button onClick="window.location.href='?dia={data_str}'">{dia.day} {marcado}</button></td>"
+                tabela += f'<td><button onclick="window.location.href=\'?dia={data_str}\'">{dia.day} {marcado}</button></td>'
         tabela += "</tr>"
     tabela += "</table>"
     st.markdown(tabela, unsafe_allow_html=True)
