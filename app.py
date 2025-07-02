@@ -3,18 +3,13 @@ import datetime
 import uuid
 import calendar
 
-# ---------------------
-# 1. CONFIGURAÇÃO INICIAL
-# ---------------------
-st.set_page_config(
-    page_title="Meu Perito",
-    layout="wide"
-)
+st.set_page_config(page_title="Meu Perito", layout="wide")
 
-# DEMO USERS (login e perfil)
+# --- DADOS EM MEMÓRIA (temporários) ---
 DEMO_USERS = {
-    "dr.hyttallo": {"password": "admin123", "role": "admin"},
-    "assistente1": {"password": "assist123", "role": "assistant"},
+    "dr.hyttallo": {"password": "admin123", "role": "admin", "first_login": False},
+    "assistente1": {"password": "assist123", "role": "assistant", "first_login": False},
+    "hc.periciamedica@hotmail.com": {"password": "admin123", "role": "admin", "first_login": False},
 }
 
 LOCATIONS = [
@@ -26,7 +21,7 @@ LOCATIONS = [
     {"id": "diversas", "name": "Estaduais (Diversas varas)", "city": "Diversas"}
 ]
 
-# Session State Inicial
+# --- SESSION STATE ---
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
 if "username" not in st.session_state:
@@ -35,18 +30,20 @@ if "role" not in st.session_state:
     st.session_state.role = None
 if "appointments" not in st.session_state:
     st.session_state.appointments = []
+if "change_password_mode" not in st.session_state:
+    st.session_state.change_password_mode = False
 
-# ---------------------
-# 2. FUNÇÕES
-# ---------------------
+# --- FUNÇÕES ---
 def login():
     user = st.session_state.user
     pwd = st.session_state.pwd
     if user in DEMO_USERS and DEMO_USERS[user]["password"] == pwd:
-        st.session_state.logged_in = True
         st.session_state.username = user
         st.session_state.role = DEMO_USERS[user]["role"]
-        st.success(f"Bem-vindo(a), {user}!")
+        if DEMO_USERS[user]["first_login"]:
+            st.session_state.change_password_mode = True
+        else:
+            st.session_state.logged_in = True
         st.rerun()
     else:
         st.error("Usuário ou senha inválidos.")
@@ -55,7 +52,15 @@ def logout():
     st.session_state.logged_in = False
     st.session_state.username = None
     st.session_state.role = None
+    st.session_state.change_password_mode = False
     st.rerun()
+
+def alterar_senha(usuario, senha_atual, nova_senha):
+    if DEMO_USERS[usuario]["password"] != senha_atual:
+        return False
+    DEMO_USERS[usuario]["password"] = nova_senha
+    DEMO_USERS[usuario]["first_login"] = False
+    return True
 
 def render_calendar(month, year):
     st.subheader(f"Calendário de {calendar.month_name[month]} de {year}")
@@ -63,7 +68,6 @@ def render_calendar(month, year):
     cols = st.columns(7)
     for i, name in enumerate(["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"]):
         cols[i].markdown(f"**{name}**")
-
     for week in days:
         cols = st.columns(7)
         for i, day in enumerate(week):
@@ -74,80 +78,48 @@ def render_calendar(month, year):
                 if cols[i].button(str(day), key=f"day_{day}_{month}"):
                     st.session_state.selected_date = date_obj
 
-# ---------------------
-# 3. AUTENTICAÇÃO
-# ---------------------
-if not st.session_state.logged_in:
+# --- AUTENTICAÇÃO E TROCA DE SENHA ---
+if not st.session_state.logged_in and not st.session_state.change_password_mode:
     st.title("🔐 Login")
     st.text_input("Usuário", key="user")
-    st.text_input("Senha", key="pwd", type="password")
+    st.text_input("Senha", type="password", key="pwd")
     st.button("Entrar", on_click=login)
     st.stop()
 
-# ---------------------
-# 4. TELA PRINCIPAL
-# ---------------------
+# --- FORÇA TROCA DE SENHA NO PRIMEIRO LOGIN ---
+if st.session_state.change_password_mode:
+    st.warning("Você deve alterar sua senha antes de continuar.")
+    with st.form("first_change_form"):
+        st.text_input("Senha atual", type="password", key="old_pass")
+        st.text_input("Nova senha", type="password", key="new_pass")
+        st.text_input("Confirme a nova senha", type="password", key="confirm_pass")
+        if st.form_submit_button("Alterar senha"):
+            if st.session_state.new_pass != st.session_state.confirm_pass:
+                st.error("As senhas novas não coincidem.")
+            elif alterar_senha(st.session_state.username, st.session_state.old_pass, st.session_state.new_pass):
+                st.success("Senha alterada com sucesso!")
+                st.session_state.change_password_mode = False
+                st.session_state.logged_in = True
+                st.rerun()
+            else:
+                st.error("Senha atual incorreta.")
+    st.stop()
+
+# --- MENU LATERAL PÓS-LOGIN ---
 st.sidebar.title("👤 Usuário")
 st.sidebar.write(f"Bem-vindo, **{st.session_state.username}**")
 st.sidebar.write(f"Perfil: **{st.session_state.role}**")
 st.sidebar.button("Sair", on_click=logout)
 
-st.title("📅 Agenda de Perícias")
-
-# Parte 1: Calendário
-today = datetime.date.today()
-month = st.sidebar.selectbox("Mês", list(range(1, 13)), index=today.month - 1)
-year = st.sidebar.selectbox("Ano", list(range(today.year, today.year + 2)), index=0)
-
-render_calendar(month, year)
-
-selected_date = st.session_state.get("selected_date", today)
-st.markdown(f"### Data Selecionada: {selected_date.strftime('%d/%m/%Y')}")
-
-with st.form("add_pericia"):
-    local = st.selectbox("Selecione o local da perícia", [l["name"] for l in LOCATIONS])
-    obs = st.text_area("Observações (opcional)")
-    submitted = st.form_submit_button("Agendar")
-    if submitted:
-        loc = next(l for l in LOCATIONS if l["name"] == local)
-        new_appt = {
-            "id": str(uuid.uuid4()),
-            "date": selected_date.isoformat(),
-            "location_id": loc["id"],
-            "location_name": loc["name"],
-            "description": obs or "-"
-        }
-        st.session_state.appointments.append(new_appt)
-        st.success(f"Perícia agendada em {loc['name']} para {selected_date.strftime('%d/%m/%Y')}.")
-
-# Parte 2: Locais
-st.markdown("---")
-st.subheader("📍 Locais de Atuação")
-for loc in LOCATIONS:
-    st.markdown(f"- **{loc['name']}** – *{loc['city']}*")
-
-# Parte 3: Lista de Perícias
-st.markdown("---")
-st.subheader("📋 Perícias Agendadas")
-
-filter_loc = st.selectbox("Filtrar por local", ["Todos"] + [l["name"] for l in LOCATIONS])
-filtros = []
-
-for appt in sorted(st.session_state.appointments, key=lambda x: x["date"]):
-    appt_date = datetime.date.fromisoformat(appt["date"])
-    if filter_loc != "Todos" and appt["location_name"] != filter_loc:
-        continue
-    filtros.append(appt)
-
-if filtros:
-    for appt in filtros:
-        appt_date = datetime.date.fromisoformat(appt["date"])
-        st.markdown(f"🗓️ {appt_date.strftime('%d/%m/%Y')} – **{appt['location_name']}**")
-        st.markdown(f"↪️ {appt['description']}")
-        if st.session_state.role == "admin":
-            if st.button("Excluir", key=f"del_{appt['id']}"):
-                st.session_state.appointments.remove(appt)
-                st.rerun()
-        st.markdown("---")
-else:
-    st.info("Nenhuma perícia encontrada para o filtro selecionado.")
+# --- ALTERAÇÃO DE SENHA MANUAL ---
+with st.sidebar.expander("🔒 Alterar senha"):
+    st.text_input("Senha atual", type="password", key="manual_old")
+    st.text_input("Nova senha", type="password", key="manual_new")
+    st.text_input("Confirmar nova senha", type="password", key="manual_confirm")
+    if st.button("Atualizar senha"):
+        if st.session_state.manual_new != st.session_state.manual_confirm:
+            st.sidebar.error("As senhas novas não coincidem.")
+        elif alterar_senha(st.session_state.username, st.session_state.manual_old, st.session_state.manual_new):
+            st.sidebar.success("Senha atualizada com sucesso!")
+        else:
+            st.sidebar.error("Senha atual incorreta.")
