@@ -64,7 +64,7 @@ def change_password(id_token, new_password):
 
 def get_user_data(uid):
     """Obtém os dados de um utilizador (perfil, etc.) do Firestore."""
-    db = init_firestore()
+    db = init_firebase() # CORRIGIDO
     user_doc_ref = db.collection('users').document(uid)
     user_doc = user_doc_ref.get()
     
@@ -89,7 +89,7 @@ def register_user(email, password, display_name, role='Assistente'):
     """Regista um novo utilizador."""
     try:
         user = auth.create_user(email=email, password=password, display_name=display_name)
-        db = init_firestore()
+        db = init_firebase() # CORRIGIDO
         db.collection('users').document(user.uid).set({
             'email': email,
             'display_name': display_name,
@@ -144,7 +144,7 @@ def render_password_change_screen():
         if submitted:
             if new_password and len(new_password) >= 6 and new_password == confirm_password:
                 if change_password(st.session_state.id_token, new_password):
-                    db = init_firestore()
+                    db = init_firebase() # CORRIGIDO
                     db.collection('users').document(st.session_state.uid).update({'first_login': False})
                     st.session_state.force_password_change = False
                     st.success("Senha alterada com sucesso! A redirecionar...")
@@ -187,7 +187,7 @@ def render_main_app():
                         register_user(new_email, "123456", new_name, role='Assistente')
                     else:
                         st.warning("Por favor, preencha o email e o nome.")
-        st.divider()
+            st.divider()
 
     # Lógica de navegação para o resto da aplicação
     if 'view' not in st.session_state:
