@@ -1,12 +1,14 @@
 # Meu Perito - Sistema de Gestão de Laudos
-# Versão 7.0: Implementação de um sistema de autenticação e perfis de utilizador.
-# Objetivo: Criar uma aplicação segura, multi-utilizador, com perfis de Administrador e Assistente,
-# e uma interface de login profissional, conforme a visão do utilizador.
+# Versão 7.1: Implementa autenticação real com Firebase e mudança de senha.
+# Objetivo: Criar um sistema de login seguro que se conecta ao Firebase Authentication,
+# força a mudança de senha no primeiro acesso e estabelece a base para a gestão de utilizadores.
 
 import streamlit as st
 import firebase_admin
 from firebase_admin import credentials, firestore, auth
 import datetime
+import requests
+import json
 
 # --- 1. CONFIGURAÇÃO E INICIALIZAÇÃO ---
 
@@ -25,75 +27,91 @@ def init_firebase():
 
 # --- 2. LÓGICA DE AUTENTICAÇÃO ---
 
-def register_user(email, password, display_name, role='Assistente'):
-    """Regista um novo utilizador no Firebase Authentication e Firestore."""
+def sign_in(email, password):
+    """Autentica um utilizador usando a API REST do Firebase."""
+    api_key = st.secrets["FIREBASE_WEB_API_KEY"]
+    rest_api_url = f"https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key={api_key}"
+    payload = json.dumps({
+        "email": email,
+        "password": password,
+        "returnSecureToken": True
+    })
     try:
-        user = auth.create_user(
-            email=email,
-            password=password,
-            display_name=display_name
-        )
-        db = init_firestore()
-        db.collection('users').document(user.uid).set({
-            'email': email,
-            'display_name': display_name,
-            'role': role
-        })
-        st.success(f"Utilizador '{display_name}' criado com sucesso!")
-        return user
+        response = requests.post(rest_api_url, data=payload)
+        response.raise_for_status() # Lança um erro para respostas 4xx/5xx
+        return response.json()
+    except requests.exceptions.HTTPError as e:
+        st.error("Email ou senha inválidos. Por favor, tente novamente.")
+        return None
     except Exception as e:
-        st.error(f"Erro ao criar utilizador: {e}")
+        st.error(f"Ocorreu um erro de conexão: {e}")
         return None
 
-def get_user_role(uid):
-    """Obtém o perfil (role) de um utilizador do Firestore."""
+def change_password(id_token, new_password):
+    """Altera a senha de um utilizador usando a API REST."""
+    api_key = st.secrets["FIREBASE_WEB_API_KEY"]
+    rest_api_url = f"https://identitytoolkit.googleapis.com/v1/accounts:update?key={api_key}"
+    payload = json.dumps({
+        "idToken": id_token,
+        "password": new_password,
+        "returnSecureToken": False
+    })
+    try:
+        response = requests.post(rest_api_url, data=payload)
+        response.raise_for_status()
+        return True
+    except Exception:
+        return False
+
+def get_user_data(uid):
+    """Obtém os dados de um utilizador (perfil, etc.) do Firestore."""
     db = init_firestore()
     user_doc = db.collection('users').document(uid).get()
     if user_doc.exists:
-        return user_doc.to_dict().get('role', 'Assistente')
-    return None
+        return user_doc.to_dict()
+    
+    # Se o documento não existir (ex: primeiro login do admin), cria-o
+    user_record = auth.get_user(uid)
+    user_data = {
+        'email': user_record.email,
+        'display_name': user_record.display_name or 'Administrador',
+        'role': 'Administrador', # Assume que o primeiro utilizador é admin
+        'first_login': True
+    }
+    db.collection('users').document(uid).set(user_data)
+    return user_data
 
 # --- 3. TELAS DA APLICAÇÃO ---
 
 def render_login_screen():
-    """Renderiza a tela de login."""
     st.set_page_config(layout="centered")
-    
-    # Estilo para o título
     st.markdown("""
         <style>
-        .title {
-            font-family: 'Garamond', serif;
-            font-style: italic;
-            font-size: 48px;
-            text-align: center;
-            color: #2E4053;
-        }
+        .title { font-family: 'Garamond', serif; font-style: italic; font-size: 48px; text-align: center; color: #2E4053; }
         </style>
         <h1 class="title">Meu Perito</h1>
     """, unsafe_allow_html=True)
     
-    st.write("") # Espaço
-
     with st.form("login_form"):
-        email = st.text_input("Email (ou nome de utilizador)", placeholder="hyttallocarneiro")
+        email = st.text_input("Email")
         password = st.text_input("Senha", type="password")
         submitted = st.form_submit_button("Entrar")
 
         if submitted:
-            # Lógica de login (simplificada para este exemplo)
-            # A integração real usaria a API de cliente do Firebase
-            if email == 'hyttallocarneiro' and password == '123456':
+            user_info = sign_in(email, password)
+            if user_info:
                 st.session_state.logged_in = True
-                st.session_state.user_name = "Hyttallo Carneiro"
-                st.session_state.user_role = "Administrador"
-                st.session_state.first_login = True # Simula o primeiro login
+                st.session_state.uid = user_info['localId']
+                st.session_state.id_token = user_info['idToken']
+                
+                user_data = get_user_data(st.session_state.uid)
+                st.session_state.user_name = user_data.get('display_name')
+                st.session_state.user_role = user_data.get('role')
+                st.session_state.force_password_change = user_data.get('first_login', False)
+                
                 st.rerun()
-            else:
-                st.error("Email ou senha inválidos.")
 
 def render_password_change_screen():
-    """Renderiza a tela de mudança de senha obrigatória."""
     st.title("Bem-vindo ao Meu Perito!")
     st.subheader("Por segurança, por favor, altere a sua senha inicial.")
     
@@ -104,32 +122,19 @@ def render_password_change_screen():
 
         if submitted:
             if new_password and new_password == confirm_password:
-                # Lógica para alterar a senha no Firebase Auth
-                st.success("Senha alterada com sucesso! A redirecionar...")
-                st.session_state.first_login = False
-                st.rerun()
+                if change_password(st.session_state.id_token, new_password):
+                    db = init_firestore()
+                    db.collection('users').document(st.session_state.uid).update({'first_login': False})
+                    st.session_state.force_password_change = False
+                    st.success("Senha alterada com sucesso! A redirecionar...")
+                    st.rerun()
+                else:
+                    st.error("Não foi possível alterar a senha. Tente novamente.")
             else:
                 st.error("As senhas não coincidem ou estão em branco.")
 
-def render_admin_panel():
-    """Renderiza o painel de administração para gestão de utilizadores."""
-    st.header("Gestão de Utilizadores")
-    with st.expander("Criar Novo Utilizador (Assistente)"):
-        with st.form("create_user_form", clear_on_submit=True):
-            new_email = st.text_input("Email do Assistente")
-            new_name = st.text_input("Nome do Assistente")
-            new_password = st.text_input("Senha Inicial", type="password")
-            submitted = st.form_submit_button("Criar Assistente")
-            
-            if submitted and new_email and new_name and new_password:
-                # A chamada real seria: register_user(new_email, new_password, new_name)
-                st.success(f"Utilizador '{new_name}' criado com sucesso! (Funcionalidade de exemplo)")
-
 def render_main_app():
-    """Renderiza a aplicação principal após o login."""
     st.set_page_config(layout="wide")
-
-    # Cabeçalho com nome do utilizador
     col1, col2 = st.columns([4, 1])
     with col1:
         st.title("Sistema de Gestão de Laudos")
@@ -137,48 +142,21 @@ def render_main_app():
         st.write(f"Utilizador: **{st.session_state.user_name}**")
         st.write(f"Perfil: *{st.session_state.user_role}*")
         if st.button("Sair"):
-            for key in list(st.session_state.keys()):
-                del st.session_state[key]
+            for key in list(st.session_state.keys()): del st.session_state[key]
             st.rerun()
-    
     st.divider()
-
-    # Painel de Administração visível apenas para o Administrador
-    if st.session_state.user_role == 'Administrador':
-        render_admin_panel()
-        st.divider()
-
-    # O resto da aplicação (seleção de local, data, etc.) viria aqui.
-    # Por enquanto, vamos manter a estrutura que já tínhamos.
-    if 'view' not in st.session_state:
-        st.session_state.view = 'home'
-
-    if st.session_state.view == 'home':
-        st.header("Selecione o Local da Perícia")
-        if st.button("17ª Vara Federal - Juazeiro", use_container_width=True):
-            st.session_state.view = 'date_selection'
-            st.rerun()
-    elif st.session_state.view == 'date_selection':
-        st.header("Selecione a Data")
-        selected_date = st.date_input("Data das perícias:", datetime.date.today(), format="DD/MM/YYYY")
-        if st.button("Ver Processos", use_container_width=True):
-            st.info("A lista de processos apareceria aqui.")
-        if st.button("Voltar"):
-            st.session_state.view = 'home'
-            st.rerun()
+    st.info("Aplicação principal - Funcionalidades de gestão de perícias serão adicionadas aqui.")
 
 # --- PONTO DE ENTRADA PRINCIPAL ---
 
 # Inicializa o estado da sessão
 if 'logged_in' not in st.session_state:
     st.session_state.logged_in = False
-if 'first_login' not in st.session_state:
-    st.session_state.first_login = False
 
 # Lógica de roteamento
 if not st.session_state.logged_in:
     render_login_screen()
-elif st.session_state.first_login:
+elif st.session_state.get('force_password_change', False):
     render_password_change_screen()
 else:
     render_main_app()
