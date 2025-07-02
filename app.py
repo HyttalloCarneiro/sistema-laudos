@@ -1,5 +1,5 @@
 # Meu Perito - Sistema de Gestão de Laudos
-# Versão 7.4: Consulta agendamentos por data selecionada
+# Versão 7.5: Datas em formato brasileiro e tabela ordenada por data
 
 import streamlit as st
 import firebase_admin
@@ -8,6 +8,7 @@ import datetime
 import requests
 import json
 import base64
+import pandas as pd
 
 # --- 1. CONFIGURAÇÃO E INICIALIZAÇÃO ---
 
@@ -237,9 +238,20 @@ def render_main_app():
 
         st.divider()
         st.subheader("📅 Todos os Agendamentos Salvos")
+
         dados = carregar_agendamentos(st.session_state.uid)
+
         if dados:
-            st.dataframe(dados, use_container_width=True)
+            for d in dados:
+                try:
+                    d["Data da Perícia"] = datetime.datetime.strptime(d["Data da Perícia"], "%Y-%m-%d").strftime("%d/%m/%Y")
+                except:
+                    pass
+
+            df = pd.DataFrame(dados)
+            df = df.sort_values(by="Data da Perícia", ascending=True)
+
+            st.dataframe(df, use_container_width=True)
         else:
             st.info("Nenhum agendamento encontrado.")
 
