@@ -79,7 +79,7 @@ def render_calendar(month, year):
 
 # --- AUTENTICAÇÃO E TROCA DE SENHA ---
 if not st.session_state.logged_in and not st.session_state.change_password_mode:
-    st.title("🔐 Login")
+    st.title("🔐 Acesso ao Sistema")
     st.text_input("Usuário", key="user")
     st.text_input("Senha", type="password", key="pwd")
     st.button("Entrar", on_click=login)
