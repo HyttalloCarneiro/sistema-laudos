@@ -1,6 +1,6 @@
 # Sistema de Gestão de Laudos Periciais
-# Versão 3.0.1: Adiciona correção automática para a formatação da chave privada do Firebase.
-# Objetivo: Aumentar a robustez do aplicativo contra erros de formatação nos segredos.
+# Versão 3.0.2: Reverte a manipulação da chave privada para confiar no formato TOML.
+# Objetivo: Corrigir o erro "item assignment" de forma definitiva.
 
 import streamlit as st
 import google.generativeai as genai
@@ -15,9 +15,9 @@ def init_firestore():
     """Inicializa e retorna o cliente do Firestore."""
     if not firebase_admin._apps:
         try:
+            # A linha que manipulava a chave foi removida.
+            # Agora confiamos 100% no formato dos Segredos do Streamlit.
             creds_dict = st.secrets["firebase_credentials"]
-            # **CORREÇÃO ADICIONADA:** Garante que as quebras de linha na chave privada sejam formatadas corretamente.
-            creds_dict['private_key'] = creds_dict['private_key'].replace('\\n', '\n')
             creds = credentials.Certificate(creds_dict)
             firebase_admin.initialize_app(creds)
         except Exception as e:
