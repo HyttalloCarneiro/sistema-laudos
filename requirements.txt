@@ -1,5 +1,2 @@
 streamlit
-google-generativeai
-PyPDF2
-firebase-admin
 requests
