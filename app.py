@@ -45,7 +45,7 @@ def login():
         else:
             st.session_state.logged_in = True
     else:
-        st.error("Usuário ou senha inválidos.")
+        st.error("Email ou senha inválidos.")
 
 def logout():
     st.session_state.logged_in = False
@@ -77,12 +77,28 @@ def render_calendar(month, year):
                 if cols[i].button(str(day), key=f"day_{day}_{month}"):
                     st.session_state.selected_date = date_obj
 
-# --- AUTENTICAÇÃO E TROCA DE SENHA ---
+# --- TELA DE LOGIN OU TROCA DE SENHA INICIAL ---
 if not st.session_state.logged_in and not st.session_state.change_password_mode:
-    st.title("🔐 Acesso ao Sistema")
-    st.text_input("Usuário", key="user")
-    st.text_input("Senha", type="password", key="pwd")
-    st.button("Entrar", on_click=login)
+    st.markdown("""
+        <style>
+            .centered-form {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                height: 70vh;
+            }
+            .stTextInput>div>input {
+                text-align: center;
+            }
+        </style>
+    """, unsafe_allow_html=True)
+
+    st.markdown("<h1 style='text-align: center;'>Meu Perito</h1>", unsafe_allow_html=True)
+    with st.container():
+        st.text_input("Email (ou nome de utilizador)", key="user")
+        st.text_input("Senha", type="password", key="pwd")
+        st.button("Entrar", on_click=login)
     st.stop()
 
 # --- FORÇA TROCA DE SENHA NO PRIMEIRO LOGIN ---
@@ -105,20 +121,4 @@ if st.session_state.change_password_mode:
     st.stop()
 
 # --- MENU LATERAL PÓS-LOGIN ---
-st.sidebar.title("👤 Usuário")
-st.sidebar.write(f"Bem-vindo, **{st.session_state.username}**")
-st.sidebar.write(f"Perfil: **{st.session_state.role}**")
-st.sidebar.button("Sair", on_click=logout)
-
-# --- ALTERAÇÃO DE SENHA MANUAL ---
-with st.sidebar.expander("🔒 Alterar senha"):
-    st.text_input("Senha atual", type="password", key="manual_old")
-    st.text_input("Nova senha", type="password", key="manual_new")
-    st.text_input("Confirmar nova senha", type="password", key="manual_confirm")
-    if st.button("Atualizar senha"):
-        if st.session_state.manual_new != st.session_state.manual_confirm:
-            st.sidebar.error("As senhas novas não coincidem.")
-        elif alterar_senha(st.session_state.username, st.session_state.manual_old, st.session_state.manual_new):
-            st.sidebar.success("Senha atualizada com sucesso!")
-        else:
-            st.sidebar.error("Senha atual incorreta.")
+st.sidebar.title("
