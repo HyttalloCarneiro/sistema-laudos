@@ -1,5 +1,5 @@
 # Meu Perito - Sistema de Gestão de Laudos
-# Versão 7.5: Datas em formato brasileiro e tabela ordenada por data
+# Versão 7.6: Tela unificada com filtro por local e/ou data + formato DD-MM-AAAA
 
 import streamlit as st
 import firebase_admin
@@ -89,7 +89,7 @@ def register_user(email, password, display_name, role='Assistente'):
         st.error(f"Erro ao criar usuário: {e}")
         return False
 
-# --- 3. FUNÇÕES DE AGENDA ---
+# --- 3. AGENDAMENTO ---
 
 def salvar_agendamento(uid, local, data):
     try:
@@ -185,78 +185,55 @@ def render_main_app():
 
     st.divider()
 
-    if st.session_state.user_role == 'Administrador':
-        with st.expander("Painel de Administração"):
-            st.subheader("Gestão de Usuários")
-            with st.form("create_user_form", clear_on_submit=True):
-                col_a, col_b, col_c = st.columns([2,2,1])
-                new_email = col_a.text_input("Email")
-                new_name = col_b.text_input("Nome")
-                if col_c.form_submit_button("Criar"):
-                    if new_email and new_name:
-                        register_user(new_email, "123456", new_name)
-                    else:
-                        st.warning("Preencha o email e o nome.")
+    st.header("📅 Agendamento e Consulta")
 
-    if 'view' not in st.session_state:
-        st.session_state.view = 'home'
+    locais = ["17ª Vara Federal - Juazeiro", "Interior (designar)", "Sede da Justiça Federal"]
+    local_escolhido = st.selectbox("Local da Perícia:", locais)
+    data_escolhida = st.date_input("Data da Perícia:", datetime.date.today(), format="DD-MM-YYYY")
 
-    if st.session_state.view == 'home':
-        st.header("Selecione o Local da Perícia")
-        if st.button("17ª Vara Federal - Juazeiro", use_container_width=True):
-            st.session_state.view = 'date_selection'
-            st.rerun()
+    col1, col2 = st.columns(2)
 
-    elif st.session_state.view == 'date_selection':
-        st.header("Agendamento da Perícia")
+    with col1:
+        if st.button("✅ Confirmar Agendamento"):
+            if salvar_agendamento(st.session_state.uid, local_escolhido, data_escolhida):
+                st.success(f"Agendamento salvo para {data_escolhida.strftime('%d-%m-%Y')} no local: {local_escolhido}")
 
-        local_escolhido = "17ª Vara Federal - Juazeiro"
-        selected_date = st.date_input("📅 Data da perícia:", datetime.date.today(), format="DD/MM/YYYY")
-
-        col1, col2 = st.columns(2)
-
-        with col1:
-            if st.button("✅ Confirmar Agendamento", use_container_width=True):
-                if salvar_agendamento(st.session_state.uid, local_escolhido, selected_date):
-                    st.success(f"Agendamento salvo com sucesso para {selected_date.strftime('%d/%m/%Y')} no local: {local_escolhido}")
-                else:
-                    st.error("Erro ao salvar o agendamento.")
-
-        with col2:
-            if st.button("🔍 Ver Agendamentos da Data", use_container_width=True):
-                dados_data = carregar_agendamentos(st.session_state.uid)
-                filtrados = [d for d in dados_data if d["Data da Perícia"] == selected_date.strftime('%Y-%m-%d')]
-                if filtrados:
-                    st.subheader("📋 Agendamentos Encontrados:")
-                    st.table(filtrados)
-                else:
-                    st.info("Nenhum agendamento encontrado para esta data.")
-
-        if st.button("🔙 Voltar"):
-            st.session_state.view = 'home'
-            st.rerun()
-
-        st.divider()
-        st.subheader("📅 Todos os Agendamentos Salvos")
-
-        dados = carregar_agendamentos(st.session_state.uid)
-
-        if dados:
+    with col2:
+        if st.button("🔍 Consultar Agendamentos"):
+            dados = carregar_agendamentos(st.session_state.uid)
+            resultados = []
             for d in dados:
-                try:
-                    d["Data da Perícia"] = datetime.datetime.strptime(d["Data da Perícia"], "%Y-%m-%d").strftime("%d/%m/%Y")
-                except:
-                    pass
+                if (
+                    (not local_escolhido or d['Local'] == local_escolhido)
+                    and (not data_escolhida or d['Data da Perícia'] == data_escolhida.strftime('%Y-%m-%d'))
+                ):
+                    d_formatado = {
+                        "Data da Perícia": datetime.datetime.strptime(d["Data da Perícia"], "%Y-%m-%d").strftime("%d-%m-%Y"),
+                        "Local": d["Local"]
+                    }
+                    resultados.append(d_formatado)
+            if resultados:
+                st.subheader("📋 Resultados Encontrados:")
+                st.table(resultados)
+            else:
+                st.info("Nenhum agendamento encontrado com os critérios selecionados.")
 
-            df = pd.DataFrame(dados)
-            df = df.sort_values(by="Data da Perícia", ascending=True)
+    st.divider()
+    st.subheader("📌 Todos os Agendamentos")
+    todos = carregar_agendamentos(st.session_state.uid)
+    if todos:
+        for d in todos:
+            try:
+                d["Data da Perícia"] = datetime.datetime.strptime(d["Data da Perícia"], "%Y-%m-%d").strftime("%d-%m-%Y")
+            except:
+                pass
+        df = pd.DataFrame(todos)
+        df = df.sort_values(by="Data da Perícia")
+        st.dataframe(df, use_container_width=True)
+    else:
+        st.info("Nenhum agendamento registrado.")
 
-            st.dataframe(df, use_container_width=True)
-        else:
-            st.info("Nenhum agendamento encontrado.")
-
-# --- INÍCIO DO APP ---
-
+# --- INÍCIO ---
 if 'logged_in' not in st.session_state:
     st.session_state.logged_in = False
 
