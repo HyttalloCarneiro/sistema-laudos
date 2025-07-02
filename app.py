@@ -126,4 +126,41 @@ if st.session_state.change_password_mode:
     st.stop()
 
 # --- MENU LATERAL PÓS-LOGIN ---
-st.sidebar.title("
+st.sidebar.title("👤 Usuário")
+st.sidebar.write(f"Bem-vindo, **{st.session_state.username}**")
+st.sidebar.write(f"Perfil: **{st.session_state.role}**")
+st.sidebar.button("Sair", on_click=logout)
+
+# --- ALTERAÇÃO DE SENHA MANUAL ---
+with st.sidebar.expander("🔒 Alterar senha"):
+    st.text_input("Senha atual", type="password", key="manual_old")
+    st.text_input("Nova senha", type="password", key="manual_new")
+    st.text_input("Confirmar nova senha", type="password", key="manual_confirm")
+    if st.button("Atualizar senha"):
+        if st.session_state.manual_new != st.session_state.manual_confirm:
+            st.sidebar.error("As senhas novas não coincidem.")
+        elif alterar_senha(st.session_state.username, st.session_state.manual_old, st.session_state.manual_new):
+            st.sidebar.success("Senha atualizada com sucesso!")
+        else:
+            st.sidebar.error("Senha atual incorreta.")
+
+# --- CADASTRO DE NOVOS USUÁRIOS ---
+if st.session_state.role == "admin":
+    st.sidebar.markdown("---")
+    with st.sidebar.expander("👥 Cadastrar novo usuário"):
+        novo_usuario = st.text_input("Nome de usuário ou e-mail", key="novo_usuario")
+        nova_senha = st.text_input("Senha inicial", type="password", key="nova_senha")
+        novo_perfil = st.selectbox("Perfil", options=["assistant", "admin"], key="novo_perfil")
+
+        if st.button("Cadastrar usuário"):
+            if not novo_usuario or not nova_senha:
+                st.sidebar.error("Preencha todos os campos.")
+            elif novo_usuario in DEMO_USERS:
+                st.sidebar.error("Este usuário já está cadastrado.")
+            else:
+                DEMO_USERS[novo_usuario] = {
+                    "password": nova_senha,
+                    "role": novo_perfil,
+                    "first_login": True
+                }
+                st.sidebar.success(f"Usuário '{novo_usuario}' cadastrado com sucesso!")
