@@ -1,162 +1,152 @@
-# Meu Perito - Sistema de Gestão de Laudos
-# Versão 7.1: Implementa autenticação real com Firebase e mudança de senha.
-# Objetivo: Criar um sistema de login seguro que se conecta ao Firebase Authentication,
-# força a mudança de senha no primeiro acesso e estabelece a base para a gestão de utilizadores.
+# Sistema de Gestão de Laudos Periciais
+# Versão 3.2: Adiciona verificação de existência para a chave secreta Base64.
+# Objetivo: Fornecer mensagens de erro mais claras e garantir a robustez da inicialização.
 
 import streamlit as st
-import firebase_admin
-from firebase_admin import credentials, firestore, auth
+import google.generativeai as genai
+import PyPDF2
+from io import BytesIO
 import datetime
-import requests
+import firebase_admin
+from firebase_admin import credentials, firestore
+import base64
 import json
 
-# --- 1. CONFIGURAÇÃO E INICIALIZAÇÃO ---
-
-def init_firebase():
-    """Inicializa o Firebase Admin SDK se ainda não foi inicializado."""
+# --- 1. CONFIGURAÇÃO DO FIREBASE ---
+def init_firestore():
+    """Inicializa e retorna o cliente do Firestore usando credenciais Base64."""
     if not firebase_admin._apps:
         try:
-            creds_dict = dict(st.secrets["firebase_credentials"])
-            creds_dict['private_key'] = creds_dict['private_key'].replace('\\n', '\n')
+            # VERIFICAÇÃO ADICIONADA: Garante que o segredo existe e não está vazio.
+            if "FIREBASE_CREDENTIALS_BASE64" not in st.secrets or not st.secrets["FIREBASE_CREDENTIALS_BASE64"]:
+                st.error("O segredo 'FIREBASE_CREDENTIALS_BASE64' não foi encontrado ou está vazio. Por favor, verifique as suas configurações no painel do Streamlit Cloud.")
+                return None
+
+            creds_base64 = st.secrets["FIREBASE_CREDENTIALS_BASE64"]
+            creds_json_str = base64.b64decode(creds_base64).decode("utf-8")
+            creds_dict = json.loads(creds_json_str)
+            
             creds = credentials.Certificate(creds_dict)
             firebase_admin.initialize_app(creds)
         except Exception as e:
-            st.error(f"Erro fatal ao inicializar o Firebase: {e}")
-            st.stop()
+            st.error(f"Erro ao inicializar o Firebase. Verifique o formato das suas credenciais nos Segredos: {e}")
+            return None
     return firestore.client()
 
-# --- 2. LÓGICA DE AUTENTICAÇÃO ---
-
-def sign_in(email, password):
-    """Autentica um utilizador usando a API REST do Firebase."""
-    api_key = st.secrets["FIREBASE_WEB_API_KEY"]
-    rest_api_url = f"https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key={api_key}"
-    payload = json.dumps({
-        "email": email,
-        "password": password,
-        "returnSecureToken": True
-    })
+# --- 2. FUNÇÕES AUXILIARES ---
+def extrair_texto_de_pdf(arquivo_pdf_bytes):
     try:
-        response = requests.post(rest_api_url, data=payload)
-        response.raise_for_status() # Lança um erro para respostas 4xx/5xx
-        return response.json()
-    except requests.exceptions.HTTPError as e:
-        st.error("Email ou senha inválidos. Por favor, tente novamente.")
-        return None
-    except Exception as e:
-        st.error(f"Ocorreu um erro de conexão: {e}")
-        return None
-
-def change_password(id_token, new_password):
-    """Altera a senha de um utilizador usando a API REST."""
-    api_key = st.secrets["FIREBASE_WEB_API_KEY"]
-    rest_api_url = f"https://identitytoolkit.googleapis.com/v1/accounts:update?key={api_key}"
-    payload = json.dumps({
-        "idToken": id_token,
-        "password": new_password,
-        "returnSecureToken": False
-    })
-    try:
-        response = requests.post(rest_api_url, data=payload)
-        response.raise_for_status()
-        return True
+        arquivo_em_memoria = BytesIO(arquivo_pdf_bytes)
+        leitor_pdf = PyPDF2.PdfReader(arquivo_em_memoria)
+        texto_completo = ""
+        for pagina in leitor_pdf.pages:
+            texto_extraido = pagina.extract_text()
+            if texto_extraido:
+                texto_completo += texto_extraido + "\n"
+        return texto_completo
     except Exception:
-        return False
+        return None
 
-def get_user_data(uid):
-    """Obtém os dados de um utilizador (perfil, etc.) do Firestore."""
-    db = init_firestore()
-    user_doc = db.collection('users').document(uid).get()
-    if user_doc.exists:
-        return user_doc.to_dict()
-    
-    # Se o documento não existir (ex: primeiro login do admin), cria-o
-    user_record = auth.get_user(uid)
-    user_data = {
-        'email': user_record.email,
-        'display_name': user_record.display_name or 'Administrador',
-        'role': 'Administrador', # Assume que o primeiro utilizador é admin
-        'first_login': True
-    }
-    db.collection('users').document(uid).set(user_data)
-    return user_data
+# --- 3. LÓGICA DE NAVEGAÇÃO (TELAS) ---
+def render_home():
+    st.title("Sistema de Gestão de Laudos Periciais")
+    st.header("Selecione o Local da Perícia")
+    if st.button("17ª Vara Federal - Juazeiro", use_container_width=True):
+        st.session_state.view = 'date_selection'
+        st.session_state.location_id = '17a_vara_juazeiro'
+        st.session_state.location_name = '17ª Vara Federal - Juazeiro'
+        st.rerun()
 
-# --- 3. TELAS DA APLICAÇÃO ---
-
-def render_login_screen():
-    st.set_page_config(layout="centered")
-    st.markdown("""
-        <style>
-        .title { font-family: 'Garamond', serif; font-style: italic; font-size: 48px; text-align: center; color: #2E4053; }
-        </style>
-        <h1 class="title">Meu Perito</h1>
-    """, unsafe_allow_html=True)
-    
-    with st.form("login_form"):
-        email = st.text_input("Email")
-        password = st.text_input("Senha", type="password")
-        submitted = st.form_submit_button("Entrar")
-
-        if submitted:
-            user_info = sign_in(email, password)
-            if user_info:
-                st.session_state.logged_in = True
-                st.session_state.uid = user_info['localId']
-                st.session_state.id_token = user_info['idToken']
-                
-                user_data = get_user_data(st.session_state.uid)
-                st.session_state.user_name = user_data.get('display_name')
-                st.session_state.user_role = user_data.get('role')
-                st.session_state.force_password_change = user_data.get('first_login', False)
-                
-                st.rerun()
-
-def render_password_change_screen():
-    st.title("Bem-vindo ao Meu Perito!")
-    st.subheader("Por segurança, por favor, altere a sua senha inicial.")
-    
-    with st.form("password_change_form"):
-        new_password = st.text_input("Nova Senha", type="password")
-        confirm_password = st.text_input("Confirmar Nova Senha", type="password")
-        submitted = st.form_submit_button("Alterar Senha e Continuar")
-
-        if submitted:
-            if new_password and new_password == confirm_password:
-                if change_password(st.session_state.id_token, new_password):
-                    db = init_firestore()
-                    db.collection('users').document(st.session_state.uid).update({'first_login': False})
-                    st.session_state.force_password_change = False
-                    st.success("Senha alterada com sucesso! A redirecionar...")
-                    st.rerun()
-                else:
-                    st.error("Não foi possível alterar a senha. Tente novamente.")
-            else:
-                st.error("As senhas não coincidem ou estão em branco.")
-
-def render_main_app():
-    st.set_page_config(layout="wide")
-    col1, col2 = st.columns([4, 1])
+def render_date_selection():
+    st.title(st.session_state.location_name)
+    selected_date = st.date_input("Selecione a data das perícias:", datetime.date.today(), format="DD/MM/YYYY")
+    col1, col2 = st.columns([1, 0.2])
     with col1:
-        st.title("Sistema de Gestão de Laudos")
-    with col2:
-        st.write(f"Utilizador: **{st.session_state.user_name}**")
-        st.write(f"Perfil: *{st.session_state.user_role}*")
-        if st.button("Sair"):
-            for key in list(st.session_state.keys()): del st.session_state[key]
+        if st.button("Confirmar Data e Ver Processos", use_container_width=True):
+            st.session_state.view = 'process_list'
+            st.session_state.selected_date = selected_date.strftime("%Y-%m-%d")
             st.rerun()
+    with col2:
+        if st.button("Voltar", use_container_width=True):
+            st.session_state.view = 'home'
+            st.rerun()
+
+def render_process_list():
+    db = init_firestore()
+    if not db: return
+
+    st.title(f"Processos para {st.session_state.selected_date}")
+    st.subheader(f"Local: {st.session_state.location_name}")
+    
+    with st.form("add_process_form", clear_on_submit=True):
+        st.write("**Adicionar Novo Processo**")
+        col1, col2, col3 = st.columns([2, 2, 1])
+        with col1:
+            process_number = st.text_input("Número do Processo")
+        with col2:
+            author_name = st.text_input("Nome da Parte Autora")
+        with col3:
+            st.write("")
+            st.write("")
+            submitted = st.form_submit_button("Adicionar")
+    
+    if submitted and process_number and author_name:
+        process_data = {"number": process_number, "author": author_name, "status": "Pendente", "pdf_uploaded": False}
+        db.collection("locations").document(st.session_state.location_id).collection("schedules").document(st.session_state.selected_date).collection("processes").add(process_data)
+        st.success(f"Processo de {author_name} adicionado com sucesso!")
+
     st.divider()
-    st.info("Aplicação principal - Funcionalidades de gestão de perícias serão adicionadas aqui.")
+
+    st.header("Lista de Perícias Agendadas")
+    processes_ref = db.collection("locations").document(st.session_state.location_id).collection("schedules").document(st.session_state.selected_date).collection("processes").stream()
+    processes = [proc for proc in processes_ref]
+
+    if not processes:
+        st.info("Nenhum processo agendado para esta data. Adicione um processo acima.")
+    else:
+        for proc in processes:
+            proc_data = proc.to_dict()
+            with st.container(border=True):
+                col1, col2, col3 = st.columns([2, 1, 1])
+                with col1:
+                    st.write(f"**Autor(a):** {proc_data.get('author')}")
+                    st.write(f"**Processo:** {proc_data.get('number')}")
+                with col2:
+                    uploaded_file = st.file_uploader("Carregar PDF", type="pdf", key=f"uploader_{proc.id}")
+                    if uploaded_file:
+                        st.success(f"PDF '{uploaded_file.name}' carregado!")
+                with col3:
+                    if st.button("Gerar Laudo", key=f"laudo_{proc.id}", use_container_width=True):
+                        st.session_state.view = 'laudo_generation'
+                        st.session_state.selected_process_id = proc.id
+                        st.session_state.selected_process_data = proc_data
+                        st.rerun()
+
+    if st.button("Voltar para o Calendário"):
+        st.session_state.view = 'date_selection'
+        st.rerun()
+
+def render_laudo_generation():
+    st.title("Geração de Laudo")
+    proc_data = st.session_state.selected_process_data
+    st.subheader(f"Analisando: {proc_data.get('author')} - Proc. {proc_data.get('number')}")
+    st.info("A interface de geração de laudo que você já conhece aparecerá aqui.")
+    if st.button("Voltar para a Lista de Processos"):
+        st.session_state.view = 'process_list'
+        st.rerun()
 
 # --- PONTO DE ENTRADA PRINCIPAL ---
+if 'view' not in st.session_state:
+    st.session_state.view = 'home'
 
-# Inicializa o estado da sessão
-if 'logged_in' not in st.session_state:
-    st.session_state.logged_in = False
-
-# Lógica de roteamento
-if not st.session_state.logged_in:
-    render_login_screen()
-elif st.session_state.get('force_password_change', False):
-    render_password_change_screen()
+if st.session_state.view == 'home':
+    render_home()
+elif st.session_state.view == 'date_selection':
+    render_date_selection()
+elif st.session_state.view == 'process_list':
+    render_process_list()
+elif st.session_state.view == 'laudo_generation':
+    render_laudo_generation()
 else:
-    render_main_app()
+    st.session_state.view = 'home'
+    st.rerun()
