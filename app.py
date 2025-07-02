@@ -1,6 +1,6 @@
 # Sistema de Gestão de Laudos Periciais
-# Versão 3.1: Implementa o uso de credenciais Firebase codificadas em Base64.
-# Objetivo: Corrigir de forma definitiva os erros de formatação da chave privada.
+# Versão 3.2: Adiciona verificação de existência para a chave secreta Base64.
+# Objetivo: Fornecer mensagens de erro mais claras e garantir a robustez da inicialização.
 
 import streamlit as st
 import google.generativeai as genai
@@ -17,7 +17,11 @@ def init_firestore():
     """Inicializa e retorna o cliente do Firestore usando credenciais Base64."""
     if not firebase_admin._apps:
         try:
-            # Descodifica a string Base64 para obter o dicionário de credenciais
+            # VERIFICAÇÃO ADICIONADA: Garante que o segredo existe e não está vazio.
+            if "FIREBASE_CREDENTIALS_BASE64" not in st.secrets or not st.secrets["FIREBASE_CREDENTIALS_BASE64"]:
+                st.error("O segredo 'FIREBASE_CREDENTIALS_BASE64' não foi encontrado ou está vazio. Por favor, verifique as suas configurações no painel do Streamlit Cloud.")
+                return None
+
             creds_base64 = st.secrets["FIREBASE_CREDENTIALS_BASE64"]
             creds_json_str = base64.b64decode(creds_base64).decode("utf-8")
             creds_dict = json.loads(creds_json_str)
@@ -25,7 +29,7 @@ def init_firestore():
             creds = credentials.Certificate(creds_dict)
             firebase_admin.initialize_app(creds)
         except Exception as e:
-            st.error(f"Erro ao inicializar o Firebase a partir das credenciais Base64. Verifique os seus Segredos: {e}")
+            st.error(f"Erro ao inicializar o Firebase. Verifique o formato das suas credenciais nos Segredos: {e}")
             return None
     return firestore.client()
 
