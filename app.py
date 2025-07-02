@@ -1,7 +1,5 @@
 # Meu Perito - Sistema de Gestão de Laudos
-# Versão 7.2: Reintegra o fluxo de gestão de laudos e adiciona o painel de administração.
-# Objetivo: Construir sobre a base de autenticação funcional, adicionando a gestão de utilizadores
-# para o perfil de Administrador e reativando a interface de gestão de perícias.
+# Versão 7.2.1: Adiciona salvamento de agendamento com local e data no Firestore
 
 import streamlit as st
 import firebase_admin
@@ -10,9 +8,6 @@ import datetime
 import requests
 import json
 import base64
-import google.generativeai as genai
-import PyPDF2
-from io import BytesIO
 
 # --- 1. CONFIGURAÇÃO E INICIALIZAÇÃO ---
 
@@ -20,89 +15,100 @@ def init_firebase():
     """Inicializa o Firebase Admin SDK se ainda não foi inicializado."""
     if not firebase_admin._apps:
         try:
-            # Usa o método Base64 que é mais robusto
             creds_base64 = st.secrets["FIREBASE_CREDENTIALS_BASE64"]
             creds_json_str = base64.b64decode(creds_base64).decode("utf-8")
             creds_dict = json.loads(creds_json_str)
-            
             creds = credentials.Certificate(creds_dict)
             firebase_admin.initialize_app(creds)
         except Exception as e:
-            st.error(f"Erro fatal ao inicializar o Firebase: {e}")
+            st.error(f"Erro ao inicializar o Firebase: {e}")
             st.stop()
     return firestore.client()
 
-# --- 2. LÓGICA DE AUTENTICAÇÃO ---
+# --- 2. AUTENTICAÇÃO ---
 
 def sign_in(email, password):
-    """Autentica um utilizador usando a API REST do Firebase."""
+    """Autentica um usuário com Firebase."""
     api_key = st.secrets["FIREBASE_WEB_API_KEY"]
-    rest_api_url = f"https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key={api_key}"
+    url = f"https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key={api_key}"
     payload = json.dumps({"email": email, "password": password, "returnSecureToken": True})
     try:
-        response = requests.post(rest_api_url, data=payload)
-        response.raise_for_status()
-        return response.json()
+        res = requests.post(url, data=payload)
+        res.raise_for_status()
+        return res.json()
     except requests.exceptions.HTTPError:
-        st.error("Email ou senha inválidos. Por favor, tente novamente.")
+        st.error("Email ou senha inválidos.")
         return None
     except Exception as e:
-        st.error(f"Ocorreu um erro de conexão: {e}")
+        st.error(f"Erro de conexão: {e}")
         return None
 
 def change_password(id_token, new_password):
-    """Altera a senha de um utilizador."""
     api_key = st.secrets["FIREBASE_WEB_API_KEY"]
-    rest_api_url = f"https://identitytoolkit.googleapis.com/v1/accounts:update?key={api_key}"
+    url = f"https://identitytoolkit.googleapis.com/v1/accounts:update?key={api_key}"
     payload = json.dumps({"idToken": id_token, "password": new_password, "returnSecureToken": False})
     try:
-        response = requests.post(rest_api_url, data=payload)
-        response.raise_for_status()
+        res = requests.post(url, data=payload)
+        res.raise_for_status()
         return True
     except Exception:
         return False
 
 def get_user_data(uid):
-    """Obtém os dados de um utilizador (perfil, etc.) do Firestore."""
-    db = init_firebase() # CORRIGIDO
-    user_doc_ref = db.collection('users').document(uid)
-    user_doc = user_doc_ref.get()
-    
-    if user_doc.exists:
-        return user_doc.to_dict()
-    
+    db = init_firebase()
+    doc_ref = db.collection('users').document(uid)
+    doc = doc_ref.get()
+    if doc.exists:
+        return doc.to_dict()
     try:
-        user_record = auth.get_user(uid)
-        user_data = {
-            'email': user_record.email,
-            'display_name': "Hyttallo Carneiro", # Nome Padrão para o Admin
+        user = auth.get_user(uid)
+        data = {
+            'email': user.email,
+            'display_name': "Hyttallo Carneiro",
             'role': 'Administrador',
             'first_login': True
         }
-        user_doc_ref.set(user_data)
-        return user_data
+        doc_ref.set(data)
+        return data
     except Exception as e:
-        st.error(f"Não foi possível obter os dados do novo utilizador: {e}")
+        st.error(f"Erro ao obter dados do usuário: {e}")
         return None
 
 def register_user(email, password, display_name, role='Assistente'):
-    """Regista um novo utilizador."""
     try:
         user = auth.create_user(email=email, password=password, display_name=display_name)
-        db = init_firebase() # CORRIGIDO
+        db = init_firebase()
         db.collection('users').document(user.uid).set({
             'email': email,
             'display_name': display_name,
             'role': role,
-            'first_login': True # Força a mudança de senha para novos utilizadores
+            'first_login': True
         })
-        st.success(f"Utilizador '{display_name}' criado com sucesso!")
+        st.success(f"Usuário '{display_name}' criado com sucesso!")
         return True
     except Exception as e:
-        st.error(f"Erro ao criar utilizador: {e}")
+        st.error(f"Erro ao criar usuário: {e}")
         return False
 
-# --- 3. TELAS DA APLICAÇÃO ---
+# --- 3. SALVAR AGENDAMENTO ---
+
+def salvar_agendamento(uid, local, data):
+    """Salva o agendamento da perícia no Firestore."""
+    try:
+        db = init_firebase()
+        agendamento = {
+            "usuario_id": uid,
+            "local": local,
+            "data": data.strftime("%Y-%m-%d"),
+            "timestamp": firestore.SERVER_TIMESTAMP
+        }
+        db.collection("agendamentos").add(agendamento)
+        return True
+    except Exception as e:
+        st.error(f"Erro ao salvar agendamento: {e}")
+        return False
+
+# --- 4. TELAS DO SISTEMA ---
 
 def render_login_screen():
     st.set_page_config(layout="centered")
@@ -124,7 +130,6 @@ def render_login_screen():
                 st.session_state.logged_in = True
                 st.session_state.uid = user_info['localId']
                 st.session_state.id_token = user_info['idToken']
-                
                 user_data = get_user_data(st.session_state.uid)
                 if user_data:
                     st.session_state.user_name = user_data.get('display_name')
@@ -133,63 +138,54 @@ def render_login_screen():
                     st.rerun()
 
 def render_password_change_screen():
-    st.title("Bem-vindo ao Meu Perito!")
-    st.subheader("Por segurança, por favor, altere a sua senha inicial.")
-    
+    st.title("Alterar Senha Inicial")
     with st.form("password_change_form"):
         new_password = st.text_input("Nova Senha", type="password")
-        confirm_password = st.text_input("Confirmar Nova Senha", type="password")
-        submitted = st.form_submit_button("Alterar Senha e Continuar")
-
-        if submitted:
-            if new_password and len(new_password) >= 6 and new_password == confirm_password:
+        confirm = st.text_input("Confirmar Nova Senha", type="password")
+        if st.form_submit_button("Alterar Senha e Continuar"):
+            if new_password == confirm and len(new_password) >= 6:
                 if change_password(st.session_state.id_token, new_password):
-                    db = init_firebase() # CORRIGIDO
+                    db = init_firebase()
                     db.collection('users').document(st.session_state.uid).update({'first_login': False})
                     st.session_state.force_password_change = False
-                    st.success("Senha alterada com sucesso! A redirecionar...")
+                    st.success("Senha alterada com sucesso!")
                     st.rerun()
                 else:
-                    st.error("Não foi possível alterar a senha. Tente novamente.")
+                    st.error("Erro ao alterar senha.")
             else:
-                st.error("As senhas não coincidem ou devem ter pelo menos 6 caracteres.")
+                st.error("Senhas devem coincidir e ter pelo menos 6 caracteres.")
 
 def render_main_app():
-    """Renderiza a aplicação principal após o login."""
     st.set_page_config(layout="wide")
 
-    # Cabeçalho com nome do utilizador e botão de sair
     col1, col2 = st.columns([4, 1])
     with col1:
         st.title("Sistema de Gestão de Laudos")
     with col2:
-        st.write(f"Utilizador: **{st.session_state.user_name}**")
+        st.write(f"Usuário: **{st.session_state.user_name}**")
         st.write(f"Perfil: *{st.session_state.user_role}*")
         if st.button("Sair"):
-            for key in list(st.session_state.keys()): del st.session_state[key]
+            for key in list(st.session_state.keys()):
+                del st.session_state[key]
             st.rerun()
     
     st.divider()
 
-    # Painel de Administração visível apenas para o Administrador
     if st.session_state.user_role == 'Administrador':
         with st.expander("Painel de Administração"):
-            st.subheader("Gestão de Utilizadores")
+            st.subheader("Gestão de Usuários")
             with st.form("create_user_form", clear_on_submit=True):
-                st.write("**Criar Novo Utilizador (Assistente)**")
+                st.write("**Criar Novo Usuário (Assistente)**")
                 col_a, col_b, col_c = st.columns([2,2,1])
-                new_email = col_a.text_input("Email do Assistente")
-                new_name = col_b.text_input("Nome do Assistente")
-                
+                new_email = col_a.text_input("Email")
+                new_name = col_b.text_input("Nome")
                 if col_c.form_submit_button("Criar"):
                     if new_email and new_name:
-                        # A senha inicial é sempre '123456'
-                        register_user(new_email, "123456", new_name, role='Assistente')
+                        register_user(new_email, "123456", new_name)
                     else:
-                        st.warning("Por favor, preencha o email e o nome.")
+                        st.warning("Preencha o email e o nome.")
             st.divider()
 
-    # Lógica de navegação para o resto da aplicação
     if 'view' not in st.session_state:
         st.session_state.view = 'home'
 
@@ -198,17 +194,24 @@ def render_main_app():
         if st.button("17ª Vara Federal - Juazeiro", use_container_width=True):
             st.session_state.view = 'date_selection'
             st.rerun()
+
     elif st.session_state.view == 'date_selection':
-        st.header("Selecione a Data")
-        selected_date = st.date_input("Data das perícias:", datetime.date.today(), format="DD/MM/YYYY")
-        if st.button("Ver Processos", use_container_width=True):
-            st.info("A lista de processos apareceria aqui. (Funcionalidade a ser reintegrada)")
-        if st.button("Voltar"):
+        st.header("Agendamento da Perícia")
+
+        local_escolhido = "17ª Vara Federal - Juazeiro"
+        selected_date = st.date_input("📅 Data da perícia:", datetime.date.today(), format="DD/MM/YYYY")
+
+        if st.button("✅ Confirmar Agendamento", use_container_width=True):
+            if salvar_agendamento(st.session_state.uid, local_escolhido, selected_date):
+                st.success(f"Agendamento salvo com sucesso para {selected_date.strftime('%d/%m/%Y')} no local: {local_escolhido}")
+            else:
+                st.error("Erro ao salvar o agendamento.")
+
+        if st.button("🔙 Voltar"):
             st.session_state.view = 'home'
             st.rerun()
-    # As outras telas (process_list, data_entry) serão reintegradas aqui.
 
-# --- PONTO DE ENTRADA PRINCIPAL ---
+# --- 5. INÍCIO DO APLICATIVO ---
 
 if 'logged_in' not in st.session_state:
     st.session_state.logged_in = False
