@@ -1,5 +1,5 @@
 # Meu Perito - Sistema de Gestão de Laudos
-# Versão 7.6: Tela unificada com filtro por local e/ou data + formato DD-MM-AAAA
+# Versão 8.0: Tela inicial com calendário mensal + lista de locais + exclusão de agendamentos
 
 import streamlit as st
 import firebase_admin
@@ -10,8 +10,7 @@ import json
 import base64
 import pandas as pd
 
-# --- 1. CONFIGURAÇÃO E INICIALIZAÇÃO ---
-
+# --- 1. CONFIGURAÇÃO ---
 def init_firebase():
     if not firebase_admin._apps:
         try:
@@ -26,7 +25,6 @@ def init_firebase():
     return firestore.client()
 
 # --- 2. AUTENTICAÇÃO ---
-
 def sign_in(email, password):
     api_key = st.secrets["FIREBASE_WEB_API_KEY"]
     url = f"https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key={api_key}"
@@ -90,7 +88,6 @@ def register_user(email, password, display_name, role='Assistente'):
         return False
 
 # --- 3. AGENDAMENTO ---
-
 def salvar_agendamento(uid, local, data):
     try:
         db = init_firebase()
@@ -115,6 +112,7 @@ def carregar_agendamentos(uid):
         for doc in docs:
             d = doc.to_dict()
             dados.append({
+                "id": doc.id,
                 "Data da Perícia": d.get("data"),
                 "Local": d.get("local"),
             })
@@ -123,8 +121,15 @@ def carregar_agendamentos(uid):
         st.error(f"Erro ao carregar agendamentos: {e}")
         return []
 
-# --- 4. TELAS ---
+def excluir_agendamento(doc_id):
+    try:
+        db = init_firebase()
+        db.collection("agendamentos").document(doc_id).delete()
+        st.success("Agendamento excluído com sucesso!")
+    except Exception as e:
+        st.error(f"Erro ao excluir: {e}")
 
+# --- 4. TELAS ---
 def render_login_screen():
     st.set_page_config(layout="centered")
     st.markdown("""
@@ -137,8 +142,7 @@ def render_login_screen():
     with st.form("login_form"):
         email = st.text_input("Email")
         password = st.text_input("Senha", type="password")
-        submitted = st.form_submit_button("Entrar")
-        if submitted:
+        if st.form_submit_button("Entrar"):
             user_info = sign_in(email, password)
             if user_info:
                 st.session_state.logged_in = True
@@ -171,67 +175,50 @@ def render_password_change_screen():
 
 def render_main_app():
     st.set_page_config(layout="wide")
+    st.title("📆 Calendário de Agendamentos")
+    uid = st.session_state.uid
 
-    col1, col2 = st.columns([4, 1])
-    with col1:
-        st.title("Sistema de Gestão de Laudos")
-    with col2:
-        st.write(f"Usuário: **{st.session_state.user_name}**")
-        st.write(f"Perfil: *{st.session_state.user_role}*")
-        if st.button("Sair"):
-            for key in list(st.session_state.keys()):
-                del st.session_state[key]
-            st.rerun()
+    hoje = datetime.date.today()
+    ano, mes = hoje.year, hoje.month
+    dias_mes = [datetime.date(ano, mes, d) for d in range(1, 32) if datetime.date(ano, mes, 1).replace(day=d).month == mes]
+    agendamentos = carregar_agendamentos(uid)
+    datas_agendadas = set([a['Data da Perícia'] for a in agendamentos])
 
-    st.divider()
+    st.markdown("### Selecione um dia para agendar")
+    cols = st.columns(7)
+    for i, dia in enumerate(dias_mes):
+        col = cols[i % 7]
+        label = dia.strftime("%d-%m") + (" 🔵" if dia.strftime('%Y-%m-%d') in datas_agendadas else "")
+        if col.button(label):
+            st.session_state.data_para_agendar = dia
 
-    st.header("📅 Agendamento e Consulta")
-
-    locais = ["17ª Vara Federal - Juazeiro", "Interior (designar)", "Sede da Justiça Federal"]
-    local_escolhido = st.selectbox("Local da Perícia:", locais)
-    data_escolhida = st.date_input("Data da Perícia:", datetime.date.today(), format="DD-MM-YYYY")
-
-    col1, col2 = st.columns(2)
-
-    with col1:
+    if 'data_para_agendar' in st.session_state:
+        st.markdown("---")
+        st.markdown(f"### Novo Agendamento para {st.session_state.data_para_agendar.strftime('%d-%m-%Y')}")
+        locais = ["17ª Vara Federal - Juazeiro"]
+        local = st.selectbox("Local da Perícia:", locais)
         if st.button("✅ Confirmar Agendamento"):
-            if salvar_agendamento(st.session_state.uid, local_escolhido, data_escolhida):
-                st.success(f"Agendamento salvo para {data_escolhida.strftime('%d-%m-%Y')} no local: {local_escolhido}")
+            if salvar_agendamento(uid, local, st.session_state.data_para_agendar):
+                st.success("Agendado com sucesso!")
+                del st.session_state['data_para_agendar']
+                st.rerun()
 
-    with col2:
-        if st.button("🔍 Consultar Agendamentos"):
-            dados = carregar_agendamentos(st.session_state.uid)
-            resultados = []
-            for d in dados:
-                if (
-                    (not local_escolhido or d['Local'] == local_escolhido)
-                    and (not data_escolhida or d['Data da Perícia'] == data_escolhida.strftime('%Y-%m-%d'))
-                ):
-                    d_formatado = {
-                        "Data da Perícia": datetime.datetime.strptime(d["Data da Perícia"], "%Y-%m-%d").strftime("%d-%m-%Y"),
-                        "Local": d["Local"]
-                    }
-                    resultados.append(d_formatado)
-            if resultados:
-                st.subheader("📋 Resultados Encontrados:")
-                st.table(resultados)
+    st.markdown("---")
+    st.markdown("### 📍 Locais de Perícia")
+    locais = ["17ª Vara Federal - Juazeiro"]
+    for local in locais:
+        with st.expander(f"📌 {local}"):
+            encontrados = [a for a in agendamentos if a['Local'] == local]
+            if encontrados:
+                for a in encontrados:
+                    data_fmt = datetime.datetime.strptime(a['Data da Perícia'], '%Y-%m-%d').strftime('%d-%m-%Y')
+                    col1, col2 = st.columns([5, 1])
+                    col1.write(f"📅 {data_fmt}")
+                    if col2.button("🗑️ Excluir", key=a['id']):
+                        excluir_agendamento(a['id'])
+                        st.rerun()
             else:
-                st.info("Nenhum agendamento encontrado com os critérios selecionados.")
-
-    st.divider()
-    st.subheader("📌 Todos os Agendamentos")
-    todos = carregar_agendamentos(st.session_state.uid)
-    if todos:
-        for d in todos:
-            try:
-                d["Data da Perícia"] = datetime.datetime.strptime(d["Data da Perícia"], "%Y-%m-%d").strftime("%d-%m-%Y")
-            except:
-                pass
-        df = pd.DataFrame(todos)
-        df = df.sort_values(by="Data da Perícia")
-        st.dataframe(df, use_container_width=True)
-    else:
-        st.info("Nenhum agendamento registrado.")
+                st.write("Nenhum agendamento para este local.")
 
 # --- INÍCIO ---
 if 'logged_in' not in st.session_state:
