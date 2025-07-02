@@ -1,6 +1,7 @@
 # Sistema de Gestão de Laudos Periciais
-# Versão 3.2: Adiciona verificação de existência para a chave secreta Base64.
-# Objetivo: Fornecer mensagens de erro mais claras e garantir a robustez da inicialização.
+# Versão 3.3: Correção definitiva para o erro de formatação da chave privada.
+# Objetivo: Criar uma cópia segura das credenciais antes de formatar a chave,
+# evitando o erro "item assignment" e resolvendo o "Invalid certificate argument".
 
 import streamlit as st
 import google.generativeai as genai
@@ -9,28 +10,24 @@ from io import BytesIO
 import datetime
 import firebase_admin
 from firebase_admin import credentials, firestore
-import base64
 import json
 
-# --- 1. CONFIGURAÇÃO DO FIREBASE ---
+# --- 1. CONFIGURAÇÃO DO FIREBASE (VERSÃO CORRIGIDA) ---
 def init_firestore():
-    """Inicializa e retorna o cliente do Firestore usando credenciais Base64."""
+    """Inicializa e retorna o cliente do Firestore de forma robusta."""
     if not firebase_admin._apps:
         try:
-            # VERIFICAÇÃO ADICIONADA: Garante que o segredo existe e não está vazio.
-            if "FIREBASE_CREDENTIALS_BASE64" not in st.secrets or not st.secrets["FIREBASE_CREDENTIALS_BASE64"]:
-                st.error("O segredo 'FIREBASE_CREDENTIALS_BASE64' não foi encontrado ou está vazio. Por favor, verifique as suas configurações no painel do Streamlit Cloud.")
-                return None
-
-            creds_base64 = st.secrets["FIREBASE_CREDENTIALS_BASE64"]
-            creds_json_str = base64.b64decode(creds_base64).decode("utf-8")
-            creds_dict = json.loads(creds_json_str)
+            # Cria uma cópia do dicionário de segredos para que possa ser modificado
+            creds_dict = dict(st.secrets["firebase_credentials"])
+            
+            # Substitui os literais '\\n' por quebras de linha reais '\n'
+            creds_dict['private_key'] = creds_dict['private_key'].replace('\\n', '\n')
             
             creds = credentials.Certificate(creds_dict)
             firebase_admin.initialize_app(creds)
         except Exception as e:
-            st.error(f"Erro ao inicializar o Firebase. Verifique o formato das suas credenciais nos Segredos: {e}")
-            return None
+            st.error(f"Erro fatal ao inicializar o Firebase. Verifique o formato das suas credenciais nos Segredos: {e}")
+            st.stop() # Para a execução para evitar mais erros
     return firestore.client()
 
 # --- 2. FUNÇÕES AUXILIARES ---
@@ -38,12 +35,7 @@ def extrair_texto_de_pdf(arquivo_pdf_bytes):
     try:
         arquivo_em_memoria = BytesIO(arquivo_pdf_bytes)
         leitor_pdf = PyPDF2.PdfReader(arquivo_em_memoria)
-        texto_completo = ""
-        for pagina in leitor_pdf.pages:
-            texto_extraido = pagina.extract_text()
-            if texto_extraido:
-                texto_completo += texto_extraido + "\n"
-        return texto_completo
+        return "".join(page.extract_text() for page in leitor_pdf.pages if page.extract_text())
     except Exception:
         return None
 
