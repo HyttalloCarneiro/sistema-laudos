@@ -44,7 +44,6 @@ def login():
             st.session_state.change_password_mode = True
         else:
             st.session_state.logged_in = True
-        st.rerun()
     else:
         st.error("Usuário ou senha inválidos.")
 
