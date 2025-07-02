@@ -1,7 +1,6 @@
 # Sistema de Gestão de Laudos Periciais
-# Versão 3.0: Implementação da estrutura de navegação em árvore e banco de dados.
-# Objetivo: Transformar o aplicativo em um sistema de gestão completo, permitindo
-# a organização de perícias por local e data, com armazenamento persistente.
+# Versão 3.0.2: Reverte a manipulação da chave privada para confiar no formato TOML.
+# Objetivo: Corrigir o erro "Invalid certificate argument" de forma definitiva.
 
 import streamlit as st
 import google.generativeai as genai
@@ -12,12 +11,12 @@ import firebase_admin
 from firebase_admin import credentials, firestore
 
 # --- 1. CONFIGURAÇÃO DO FIREBASE ---
-# Esta função inicializa a conexão com o banco de dados Firestore.
-# Ela usa as credenciais armazenadas de forma segura nos "Secrets" do Streamlit.
 def init_firestore():
     """Inicializa e retorna o cliente do Firestore."""
     if not firebase_admin._apps:
         try:
+            # A linha que manipulava a chave foi removida.
+            # Agora confiamos 100% no formato dos Segredos do Streamlit.
             creds_dict = st.secrets["firebase_credentials"]
             creds = credentials.Certificate(creds_dict)
             firebase_admin.initialize_app(creds)
@@ -28,7 +27,6 @@ def init_firestore():
 
 # --- 2. FUNÇÕES AUXILIARES ---
 def extrair_texto_de_pdf(arquivo_pdf_bytes):
-    # (Mesma função das versões anteriores)
     try:
         arquivo_em_memoria = BytesIO(arquivo_pdf_bytes)
         leitor_pdf = PyPDF2.PdfReader(arquivo_em_memoria)
@@ -42,14 +40,9 @@ def extrair_texto_de_pdf(arquivo_pdf_bytes):
         return None
 
 # --- 3. LÓGICA DE NAVEGAÇÃO (TELAS) ---
-
 def render_home():
-    """Tela inicial para seleção do local da perícia."""
     st.title("Sistema de Gestão de Laudos Periciais")
     st.header("Selecione o Local da Perícia")
-    
-    # No futuro, podemos carregar os locais do banco de dados.
-    # Por enquanto, temos apenas um local fixo.
     if st.button("17ª Vara Federal - Juazeiro", use_container_width=True):
         st.session_state.view = 'date_selection'
         st.session_state.location_id = '17a_vara_juazeiro'
@@ -57,15 +50,8 @@ def render_home():
         st.rerun()
 
 def render_date_selection():
-    """Tela para seleção da data das perícias."""
     st.title(st.session_state.location_name)
-    
-    selected_date = st.date_input(
-        "Selecione a data das perícias:",
-        datetime.date.today(),
-        format="DD/MM/YYYY"
-    )
-    
+    selected_date = st.date_input("Selecione a data das perícias:", datetime.date.today(), format="DD/MM/YYYY")
     col1, col2 = st.columns([1, 0.2])
     with col1:
         if st.button("Confirmar Data e Ver Processos", use_container_width=True):
@@ -78,14 +64,12 @@ def render_date_selection():
             st.rerun()
 
 def render_process_list():
-    """Tela para listar e gerir os processos de uma data específica."""
     db = init_firestore()
     if not db: return
 
     st.title(f"Processos para {st.session_state.selected_date}")
     st.subheader(f"Local: {st.session_state.location_name}")
     
-    # Formulário para adicionar um novo processo
     with st.form("add_process_form", clear_on_submit=True):
         st.write("**Adicionar Novo Processo**")
         col1, col2, col3 = st.columns([2, 2, 1])
@@ -94,31 +78,19 @@ def render_process_list():
         with col2:
             author_name = st.text_input("Nome da Parte Autora")
         with col3:
-            st.write("") # Espaçamento
-            st.write("") # Espaçamento
+            st.write("")
+            st.write("")
             submitted = st.form_submit_button("Adicionar")
     
     if submitted and process_number and author_name:
-        # Adiciona o novo processo ao Firestore
-        process_data = {
-            "number": process_number,
-            "author": author_name,
-            "status": "Pendente",
-            "pdf_uploaded": False
-        }
-        db.collection("locations").document(st.session_state.location_id)\
-          .collection("schedules").document(st.session_state.selected_date)\
-          .collection("processes").add(process_data)
+        process_data = {"number": process_number, "author": author_name, "status": "Pendente", "pdf_uploaded": False}
+        db.collection("locations").document(st.session_state.location_id).collection("schedules").document(st.session_state.selected_date).collection("processes").add(process_data)
         st.success(f"Processo de {author_name} adicionado com sucesso!")
 
     st.divider()
 
-    # Exibir a lista de processos
     st.header("Lista de Perícias Agendadas")
-    processes_ref = db.collection("locations").document(st.session_state.location_id)\
-                      .collection("schedules").document(st.session_state.selected_date)\
-                      .collection("processes").stream()
-    
+    processes_ref = db.collection("locations").document(st.session_state.location_id).collection("schedules").document(st.session_state.selected_date).collection("processes").stream()
     processes = [proc for proc in processes_ref]
 
     if not processes:
@@ -132,14 +104,8 @@ def render_process_list():
                     st.write(f"**Autor(a):** {proc_data.get('author')}")
                     st.write(f"**Processo:** {proc_data.get('number')}")
                 with col2:
-                    # O file_uploader precisa de uma chave única para cada processo
-                    uploaded_file = st.file_uploader(
-                        "Carregar PDF", 
-                        type="pdf", 
-                        key=f"uploader_{proc.id}"
-                    )
+                    uploaded_file = st.file_uploader("Carregar PDF", type="pdf", key=f"uploader_{proc.id}")
                     if uploaded_file:
-                        # Aqui você pode adicionar a lógica para salvar o PDF (versões futuras)
                         st.success(f"PDF '{uploaded_file.name}' carregado!")
                 with col3:
                     if st.button("Gerar Laudo", key=f"laudo_{proc.id}", use_container_width=True):
@@ -153,17 +119,10 @@ def render_process_list():
         st.rerun()
 
 def render_laudo_generation():
-    """Tela para gerar o laudo, similar à v2.3."""
     st.title("Geração de Laudo")
     proc_data = st.session_state.selected_process_data
     st.subheader(f"Analisando: {proc_data.get('author')} - Proc. {proc_data.get('number')}")
-    
-    # A partir daqui, o código é muito similar ao da v2.3, mas está encapsulado
-    # nesta função e opera sobre o processo selecionado.
-    # Por simplicidade, vamos colocar um placeholder por enquanto.
     st.info("A interface de geração de laudo que você já conhece aparecerá aqui.")
-    st.write("As configurações da barra lateral e a lógica de geração do laudo serão integradas nesta tela.")
-    
     if st.button("Voltar para a Lista de Processos"):
         st.session_state.view = 'process_list'
         st.rerun()
@@ -172,7 +131,6 @@ def render_laudo_generation():
 if 'view' not in st.session_state:
     st.session_state.view = 'home'
 
-# Renderiza a tela atual com base no estado da sessão
 if st.session_state.view == 'home':
     render_home()
 elif st.session_state.view == 'date_selection':
@@ -182,5 +140,5 @@ elif st.session_state.view == 'process_list':
 elif st.session_state.view == 'laudo_generation':
     render_laudo_generation()
 else:
-    st.session_state.view = 'home' # Padrão de segurança
+    st.session_state.view = 'home'
     st.rerun()
