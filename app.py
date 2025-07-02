@@ -1,5 +1,5 @@
 # Meu Perito - Sistema de Gestão de Laudos
-# Versão 7.3: Exibe agendamentos salvos por usuário
+# Versão 7.4: Consulta agendamentos por data selecionada
 
 import streamlit as st
 import firebase_admin
@@ -210,20 +210,33 @@ def render_main_app():
         st.header("Agendamento da Perícia")
 
         local_escolhido = "17ª Vara Federal - Juazeiro"
-        selected_date = st.date_input("\U0001F4C5 Data da perícia:", datetime.date.today(), format="DD/MM/YYYY")
+        selected_date = st.date_input("📅 Data da perícia:", datetime.date.today(), format="DD/MM/YYYY")
 
-        if st.button("\u2705 Confirmar Agendamento", use_container_width=True):
-            if salvar_agendamento(st.session_state.uid, local_escolhido, selected_date):
-                st.success(f"Agendamento salvo com sucesso para {selected_date.strftime('%d/%m/%Y')} no local: {local_escolhido}")
-            else:
-                st.error("Erro ao salvar o agendamento.")
+        col1, col2 = st.columns(2)
 
-        if st.button("\U0001F519 Voltar"):
+        with col1:
+            if st.button("✅ Confirmar Agendamento", use_container_width=True):
+                if salvar_agendamento(st.session_state.uid, local_escolhido, selected_date):
+                    st.success(f"Agendamento salvo com sucesso para {selected_date.strftime('%d/%m/%Y')} no local: {local_escolhido}")
+                else:
+                    st.error("Erro ao salvar o agendamento.")
+
+        with col2:
+            if st.button("🔍 Ver Agendamentos da Data", use_container_width=True):
+                dados_data = carregar_agendamentos(st.session_state.uid)
+                filtrados = [d for d in dados_data if d["Data da Perícia"] == selected_date.strftime('%Y-%m-%d')]
+                if filtrados:
+                    st.subheader("📋 Agendamentos Encontrados:")
+                    st.table(filtrados)
+                else:
+                    st.info("Nenhum agendamento encontrado para esta data.")
+
+        if st.button("🔙 Voltar"):
             st.session_state.view = 'home'
             st.rerun()
 
         st.divider()
-        st.subheader("Agendamentos Salvos")
+        st.subheader("📅 Todos os Agendamentos Salvos")
         dados = carregar_agendamentos(st.session_state.uid)
         if dados:
             st.dataframe(dados, use_container_width=True)
