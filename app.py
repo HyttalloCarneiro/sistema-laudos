@@ -1,5 +1,5 @@
 # Meu Perito - Sistema de Gestão de Laudos
-# Versão 8.0: Tela inicial com calendário mensal + lista de locais + exclusão de agendamentos
+# Versão 8.0: Novo calendário visual com navegação entre meses, estilo em tabela, cabeçalho com mês/ano, dias da semana e lista de locais logo abaixo.
 
 import streamlit as st
 import firebase_admin
@@ -8,9 +8,12 @@ import datetime
 import requests
 import json
 import base64
+import calendar
 import pandas as pd
+from io import BytesIO
 
-# --- 1. CONFIGURAÇÃO ---
+# --- 1. CONFIGURAÇÃO E INICIALIZAÇÃO ---
+
 def init_firebase():
     if not firebase_admin._apps:
         try:
@@ -24,209 +27,119 @@ def init_firebase():
             st.stop()
     return firestore.client()
 
-# --- 2. AUTENTICAÇÃO ---
-def sign_in(email, password):
-    api_key = st.secrets["FIREBASE_WEB_API_KEY"]
-    url = f"https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key={api_key}"
-    payload = json.dumps({"email": email, "password": password, "returnSecureToken": True})
-    try:
-        res = requests.post(url, data=payload)
-        res.raise_for_status()
-        return res.json()
-    except requests.exceptions.HTTPError:
-        st.error("Email ou senha inválidos.")
-        return None
-    except Exception as e:
-        st.error(f"Erro de conexão: {e}")
-        return None
+# --- 2. FUNÇÕES AUXILIARES ---
 
-def change_password(id_token, new_password):
-    api_key = st.secrets["FIREBASE_WEB_API_KEY"]
-    url = f"https://identitytoolkit.googleapis.com/v1/accounts:update?key={api_key}"
-    payload = json.dumps({"idToken": id_token, "password": new_password, "returnSecureToken": False})
-    try:
-        res = requests.post(url, data=payload)
-        res.raise_for_status()
-        return True
-    except Exception:
-        return False
-
-def get_user_data(uid):
+def carregar_agendamentos():
     db = init_firebase()
-    doc_ref = db.collection('users').document(uid)
-    doc = doc_ref.get()
-    if doc.exists:
-        return doc.to_dict()
-    try:
-        user = auth.get_user(uid)
-        data = {
-            'email': user.email,
-            'display_name': "Hyttallo Carneiro",
-            'role': 'Administrador',
-            'first_login': True
-        }
-        doc_ref.set(data)
-        return data
-    except Exception as e:
-        st.error(f"Erro ao obter dados do usuário: {e}")
-        return None
+    ag_ref = db.collection("agendamentos")
+    docs = ag_ref.stream()
+    dados = []
+    for doc in docs:
+        dados.append(doc.to_dict() | {"id": doc.id})
+    return dados
 
-def register_user(email, password, display_name, role='Assistente'):
-    try:
-        user = auth.create_user(email=email, password=password, display_name=display_name)
-        db = init_firebase()
-        db.collection('users').document(user.uid).set({
-            'email': email,
-            'display_name': display_name,
-            'role': role,
-            'first_login': True
-        })
-        st.success(f"Usuário '{display_name}' criado com sucesso!")
-        return True
-    except Exception as e:
-        st.error(f"Erro ao criar usuário: {e}")
-        return False
-
-# --- 3. AGENDAMENTO ---
-def salvar_agendamento(uid, local, data):
-    try:
-        db = init_firebase()
-        agendamento = {
-            "usuario_id": uid,
-            "local": local,
-            "data": data.strftime("%Y-%m-%d"),
-            "timestamp": firestore.SERVER_TIMESTAMP
-        }
-        db.collection("agendamentos").add(agendamento)
-        return True
-    except Exception as e:
-        st.error(f"Erro ao salvar agendamento: {e}")
-        return False
-
-def carregar_agendamentos(uid):
-    try:
-        db = init_firebase()
-        agendamentos_ref = db.collection("agendamentos").where("usuario_id", "==", uid).order_by("data")
-        docs = agendamentos_ref.stream()
-        dados = []
-        for doc in docs:
-            d = doc.to_dict()
-            dados.append({
-                "id": doc.id,
-                "Data da Perícia": d.get("data"),
-                "Local": d.get("local"),
-            })
-        return dados
-    except Exception as e:
-        st.error(f"Erro ao carregar agendamentos: {e}")
-        return []
+def salvar_agendamento(data, local):
+    db = init_firebase()
+    db.collection("agendamentos").add({
+        "data": data.strftime("%Y-%m-%d"),
+        "local": local
+    })
 
 def excluir_agendamento(doc_id):
-    try:
-        db = init_firebase()
-        db.collection("agendamentos").document(doc_id).delete()
-        st.success("Agendamento excluído com sucesso!")
-    except Exception as e:
-        st.error(f"Erro ao excluir: {e}")
+    db = init_firebase()
+    db.collection("agendamentos").document(doc_id).delete()
 
-# --- 4. TELAS ---
-def render_login_screen():
-    st.set_page_config(layout="centered")
+# --- 3. CALENDÁRIO VISUAL ---
+
+def render_calendario():
+    hoje = datetime.date.today()
+
+    if 'mes_atual' not in st.session_state:
+        st.session_state.mes_atual = hoje.month
+        st.session_state.ano_atual = hoje.year
+
+    def avancar_mes():
+        if st.session_state.mes_atual == 12:
+            st.session_state.mes_atual = 1
+            st.session_state.ano_atual += 1
+        else:
+            st.session_state.mes_atual += 1
+
+    def voltar_mes():
+        if st.session_state.mes_atual == 1:
+            st.session_state.mes_atual = 12
+            st.session_state.ano_atual -= 1
+        else:
+            st.session_state.mes_atual -= 1
+
+    col1, col2, col3 = st.columns([1,2,1])
+    with col1:
+        st.button("⬅️", on_click=voltar_mes)
+    with col2:
+        st.markdown(f"### 📆 {calendar.month_name[st.session_state.mes_atual]} de {st.session_state.ano_atual}", unsafe_allow_html=True)
+    with col3:
+        st.button("➡️", on_click=avancar_mes)
+
+    dias_semana = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"]
     st.markdown("""
-        <style>
-        .title { font-family: 'Garamond', serif; font-style: italic; font-size: 48px; text-align: center; color: #2E4053; }
-        </style>
-        <h1 class="title">Meu Perito</h1>
+    <style>
+        .calendar-table {border-collapse: collapse; width: 100%;}
+        .calendar-table th, .calendar-table td {
+            border: 1px solid #ddd; text-align: center; padding: 8px;
+        }
+        .calendar-table td:hover {background-color: #f2f2f2; cursor: pointer;}
+    </style>
     """, unsafe_allow_html=True)
 
-    with st.form("login_form"):
-        email = st.text_input("Email")
-        password = st.text_input("Senha", type="password")
-        if st.form_submit_button("Entrar"):
-            user_info = sign_in(email, password)
-            if user_info:
-                st.session_state.logged_in = True
-                st.session_state.uid = user_info['localId']
-                st.session_state.id_token = user_info['idToken']
-                user_data = get_user_data(st.session_state.uid)
-                if user_data:
-                    st.session_state.user_name = user_data.get('display_name')
-                    st.session_state.user_role = user_data.get('role')
-                    st.session_state.force_password_change = user_data.get('first_login', False)
-                    st.rerun()
+    agendamentos = carregar_agendamentos()
+    datas_agendadas = set([a['data'] for a in agendamentos])
 
-def render_password_change_screen():
-    st.title("Alterar Senha Inicial")
-    with st.form("password_change_form"):
-        new_password = st.text_input("Nova Senha", type="password")
-        confirm = st.text_input("Confirmar Nova Senha", type="password")
-        if st.form_submit_button("Alterar Senha e Continuar"):
-            if new_password == confirm and len(new_password) >= 6:
-                if change_password(st.session_state.id_token, new_password):
-                    db = init_firebase()
-                    db.collection('users').document(st.session_state.uid).update({'first_login': False})
-                    st.session_state.force_password_change = False
-                    st.success("Senha alterada com sucesso!")
-                    st.rerun()
-                else:
-                    st.error("Erro ao alterar senha.")
+    cal = calendar.Calendar(firstweekday=0)
+    semanas = cal.monthdatescalendar(st.session_state.ano_atual, st.session_state.mes_atual)
+
+    tabela = "<table class='calendar-table'>"
+    tabela += "<tr>" + "".join(f"<th>{d}</th>" for d in dias_semana) + "</tr>"
+    for semana in semanas:
+        tabela += "<tr>"
+        for dia in semana:
+            if dia.month != st.session_state.mes_atual:
+                tabela += f"<td style='color:#ccc'>{dia.day}</td>"
             else:
-                st.error("Senhas devem coincidir e ter pelo menos 6 caracteres.")
+                data_str = dia.strftime("%Y-%m-%d")
+                marcado = "🔵" if data_str in datas_agendadas else ""
+                tabela += f"<td><button onClick="window.location.href='?dia={data_str}'">{dia.day} {marcado}</button></td>"
+        tabela += "</tr>"
+    tabela += "</table>"
+    st.markdown(tabela, unsafe_allow_html=True)
 
-def render_main_app():
-    st.set_page_config(layout="wide")
-    st.title("📆 Calendário de Agendamentos")
-    uid = st.session_state.uid
+# --- 4. TELA PRINCIPAL ---
 
-    hoje = datetime.date.today()
-    ano, mes = hoje.year, hoje.month
-    dias_mes = [datetime.date(ano, mes, d) for d in range(1, 32) if datetime.date(ano, mes, 1).replace(day=d).month == mes]
-    agendamentos = carregar_agendamentos(uid)
-    datas_agendadas = set([a['Data da Perícia'] for a in agendamentos])
+def main():
+    st.set_page_config(page_title="Meu Perito", layout="wide")
+    st.title("Sistema de Gestão de Laudos")
+    render_calendario()
 
-    st.markdown("### Selecione um dia para agendar")
-    cols = st.columns(7)
-    for i, dia in enumerate(dias_mes):
-        col = cols[i % 7]
-        label = dia.strftime("%d-%m") + (" 🔵" if dia.strftime('%Y-%m-%d') in datas_agendadas else "")
-        if col.button(label):
-            st.session_state.data_para_agendar = dia
-
-    if 'data_para_agendar' in st.session_state:
-        st.markdown("---")
-        st.markdown(f"### Novo Agendamento para {st.session_state.data_para_agendar.strftime('%d-%m-%Y')}")
-        locais = ["17ª Vara Federal - Juazeiro"]
-        local = st.selectbox("Local da Perícia:", locais)
-        if st.button("✅ Confirmar Agendamento"):
-            if salvar_agendamento(uid, local, st.session_state.data_para_agendar):
-                st.success("Agendado com sucesso!")
-                del st.session_state['data_para_agendar']
-                st.rerun()
-
-    st.markdown("---")
-    st.markdown("### 📍 Locais de Perícia")
+    st.divider()
+    st.subheader("📍 Locais de Perícia")
     locais = ["17ª Vara Federal - Juazeiro"]
     for local in locais:
         with st.expander(f"📌 {local}"):
-            encontrados = [a for a in agendamentos if a['Local'] == local]
-            if encontrados:
-                for a in encontrados:
-                    data_fmt = datetime.datetime.strptime(a['Data da Perícia'], '%Y-%m-%d').strftime('%d-%m-%Y')
-                    col1, col2 = st.columns([5, 1])
-                    col1.write(f"📅 {data_fmt}")
-                    if col2.button("🗑️ Excluir", key=a['id']):
-                        excluir_agendamento(a['id'])
+            dados = [a for a in carregar_agendamentos() if a['local'] == local]
+            if dados:
+                df = pd.DataFrame(dados)
+                df['data'] = pd.to_datetime(df['data']).dt.strftime("%d-%m-%Y")
+                for i, row in df.iterrows():
+                    col1, col2, col3 = st.columns([2,2,1])
+                    col1.write(f"📅 {row['data']}")
+                    col2.write(f"📍 {row['local']}")
+                    if col3.button("🗑️ Excluir", key=f"del_{row['id']}"):
+                        excluir_agendamento(row['id'])
+                        st.success("Agendamento excluído!")
                         st.rerun()
             else:
-                st.write("Nenhum agendamento para este local.")
+                st.info("Nenhum agendamento para este local ainda.")
 
-# --- INÍCIO ---
-if 'logged_in' not in st.session_state:
-    st.session_state.logged_in = False
+# --- PONTO DE ENTRADA ---
 
-if not st.session_state.logged_in:
-    render_login_screen()
-elif st.session_state.get('force_password_change', False):
-    render_password_change_screen()
-else:
-    render_main_app()
+if __name__ == "__main__":
+    main()
