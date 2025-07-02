@@ -1,5 +1,5 @@
 # Meu Perito - Sistema de Gestão de Laudos
-# Versão 8.0: Novo calendário visual com navegação entre meses, estilo em tabela, cabeçalho com mês/ano, dias da semana e lista de locais logo abaixo.
+# Versão 8.0: Calendário otimizado com datas em português, autenticação reativada e desempenho melhorado.
 
 import streamlit as st
 import firebase_admin
@@ -8,138 +8,166 @@ import datetime
 import requests
 import json
 import base64
+import locale
 import calendar
-import pandas as pd
-from io import BytesIO
 
 # --- 1. CONFIGURAÇÃO E INICIALIZAÇÃO ---
 
-def init_firebase():
-    if not firebase_admin._apps:
-        try:
-            creds_base64 = st.secrets["FIREBASE_CREDENTIALS_BASE64"]
-            creds_json_str = base64.b64decode(creds_base64).decode("utf-8")
-            creds_dict = json.loads(creds_json_str)
-            creds = credentials.Certificate(creds_dict)
-            firebase_admin.initialize_app(creds)
-        except Exception as e:
-            st.error(f"Erro ao inicializar Firebase: {e}")
-            st.stop()
-    return firestore.client()
+locale.setlocale(locale.LC_TIME, 'pt_BR.UTF-8')  # Exibe meses e dias em português
 
-# --- 2. FUNÇÕES AUXILIARES ---
+if not firebase_admin._apps:
+    creds_base64 = st.secrets["FIREBASE_CREDENTIALS_BASE64"]
+    creds_json_str = base64.b64decode(creds_base64).decode("utf-8")
+    creds_dict = json.loads(creds_json_str)
+    creds = credentials.Certificate(creds_dict)
+    firebase_admin.initialize_app(creds)
 
-def carregar_agendamentos():
-    db = init_firebase()
-    ag_ref = db.collection("agendamentos")
-    docs = ag_ref.stream()
-    dados = []
-    for doc in docs:
-        dados.append(doc.to_dict() | {"id": doc.id})
-    return dados
+db = firestore.client()
 
-def salvar_agendamento(data, local):
-    db = init_firebase()
-    db.collection("agendamentos").add({
-        "data": data.strftime("%Y-%m-%d"),
-        "local": local
-    })
+# --- 2. AUTENTICAÇÃO SIMPLES COM FIREBASE ---
 
-def excluir_agendamento(doc_id):
-    db = init_firebase()
-    db.collection("agendamentos").document(doc_id).delete()
+def sign_in(email, password):
+    api_key = st.secrets["FIREBASE_WEB_API_KEY"]
+    rest_api_url = f"https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key={api_key}"
+    payload = json.dumps({"email": email, "password": password, "returnSecureToken": True})
+    response = requests.post(rest_api_url, data=payload)
+    if response.status_code == 200:
+        return response.json()
+    else:
+        return None
 
-# --- 3. CALENDÁRIO VISUAL ---
+# --- 3. CALENDÁRIO E AGENDAMENTOS ---
 
-def render_calendario():
+def exibir_calendario():
     hoje = datetime.date.today()
+    ano = st.session_state.get("ano", hoje.year)
+    mes = st.session_state.get("mes", hoje.month)
 
-    if 'mes_atual' not in st.session_state:
-        st.session_state.mes_atual = hoje.month
-        st.session_state.ano_atual = hoje.year
+    st.markdown(f"## 📅 {calendar.month_name[mes].capitalize()} de {ano}")
 
-    def avancar_mes():
-        if st.session_state.mes_atual == 12:
-            st.session_state.mes_atual = 1
-            st.session_state.ano_atual += 1
-        else:
-            st.session_state.mes_atual += 1
-
-    def voltar_mes():
-        if st.session_state.mes_atual == 1:
-            st.session_state.mes_atual = 12
-            st.session_state.ano_atual -= 1
-        else:
-            st.session_state.mes_atual -= 1
-
-    col1, col2, col3 = st.columns([1,2,1])
+    col1, col2, col3 = st.columns([1, 6, 1])
     with col1:
-        st.button("⬅️", on_click=voltar_mes)
-    with col2:
-        st.markdown(f"### 📆 {calendar.month_name[st.session_state.mes_atual]} de {st.session_state.ano_atual}", unsafe_allow_html=True)
+        if st.button("⬅️"):
+            if mes == 1:
+                mes = 12
+                ano -= 1
+            else:
+                mes -= 1
+            st.session_state.mes = mes
+            st.session_state.ano = ano
+            st.rerun()
+
     with col3:
-        st.button("➡️", on_click=avancar_mes)
+        if st.button("➡️"):
+            if mes == 12:
+                mes = 1
+                ano += 1
+            else:
+                mes += 1
+            st.session_state.mes = mes
+            st.session_state.ano = ano
+            st.rerun()
 
     dias_semana = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"]
-    st.markdown("""
-    <style>
-        .calendar-table {border-collapse: collapse; width: 100%;}
-        .calendar-table th, .calendar-table td {
-            border: 1px solid #ddd; text-align: center; padding: 8px;
-        }
-        .calendar-table td:hover {background-color: #f2f2f2; cursor: pointer;}
-    </style>
-    """, unsafe_allow_html=True)
-
-    agendamentos = carregar_agendamentos()
-    datas_agendadas = set([a['data'] for a in agendamentos])
-
     cal = calendar.Calendar(firstweekday=0)
-    semanas = cal.monthdatescalendar(st.session_state.ano_atual, st.session_state.mes_atual)
+    agendamentos_ref = db.collection("agendamentos").stream()
+    datas_marcadas = {a.to_dict()["data"] for a in agendamentos_ref}
 
-    tabela = "<table class='calendar-table'>"
-    tabela += "<tr>" + "".join(f"<th>{d}</th>" for d in dias_semana) + "</tr>"
-    for semana in semanas:
+    st.markdown("<style>table, th, td { border: 1px solid lightgray; padding: 6px; text-align: center; }</style>", unsafe_allow_html=True)
+    tabela = "<table><tr>" + "".join([f"<th>{dia}</th>" for dia in dias_semana]) + "</tr>"
+
+    for semana in cal.monthdatescalendar(ano, mes):
         tabela += "<tr>"
         for dia in semana:
-            if dia.month != st.session_state.mes_atual:
-                tabela += f"<td style='color:#ccc'>{dia.day}</td>"
+            if dia.month != mes:
+                tabela += "<td style='color:lightgray'>-</td>"
             else:
                 data_str = dia.strftime("%Y-%m-%d")
-                marcado = "🔵" if data_str in datas_agendadas else ""
-                tabela += f'<td><button onclick="window.location.href=\'?dia={data_str}\'">{dia.day} {marcado}</button></td>'
+                marcado = "🔵" if data_str in datas_marcadas else ""
+                link = f"?dia={data_str}"
+                tabela += f'<td><a href="{link}">{dia.day} {marcado}</a></td>'
         tabela += "</tr>"
+
     tabela += "</table>"
     st.markdown(tabela, unsafe_allow_html=True)
 
-# --- 4. TELA PRINCIPAL ---
+# --- 4. AGENDAMENTO POR DIA ---
 
-def main():
-    st.set_page_config(page_title="Meu Perito", layout="wide")
-    st.title("Sistema de Gestão de Laudos")
-    render_calendario()
+def agendar_para_dia(data_escolhida):
+    st.markdown(f"### 📌 Agendar para {data_escolhida.strftime('%d/%m/%Y')}")
+    local = st.selectbox("Local da Perícia:", ["17ª Vara Federal - Juazeiro"])
+    if st.button("✅ Confirmar Agendamento"):
+        db.collection("agendamentos").add({
+            "data": data_escolhida.strftime("%Y-%m-%d"),
+            "local": local,
+            "usuario_id": st.session_state.uid,
+            "timestamp": datetime.datetime.now()
+        })
+        st.success("Agendamento realizado com sucesso!")
 
-    st.divider()
-    st.subheader("📍 Locais de Perícia")
-    locais = ["17ª Vara Federal - Juazeiro"]
-    for local in locais:
-        with st.expander(f"📌 {local}"):
-            dados = [a for a in carregar_agendamentos() if a['local'] == local]
-            if dados:
-                df = pd.DataFrame(dados)
-                df['data'] = pd.to_datetime(df['data']).dt.strftime("%d-%m-%Y")
-                for i, row in df.iterrows():
-                    col1, col2, col3 = st.columns([2,2,1])
-                    col1.write(f"📅 {row['data']}")
-                    col2.write(f"📍 {row['local']}")
-                    if col3.button("🗑️ Excluir", key=f"del_{row['id']}"):
-                        excluir_agendamento(row['id'])
-                        st.success("Agendamento excluído!")
-                        st.rerun()
+# --- 5. VISUALIZAÇÃO POR LOCAL ---
+
+def visualizar_local(local):
+    st.markdown(f"### 📍 Agendamentos para {local}")
+    ags = db.collection("agendamentos").where("local", "==", local).stream()
+    registros = []
+    for a in ags:
+        d = a.to_dict()
+        d["id"] = a.id
+        registros.append(d)
+    registros.sort(key=lambda x: x["data"])
+    for r in registros:
+        data_formatada = datetime.datetime.strptime(r["data"], "%Y-%m-%d").strftime("%d/%m/%Y")
+        concluido = "✅ Concluído" if datetime.datetime.strptime(r["data"], "%Y-%m-%d").date() < datetime.date.today() else ""
+        col1, col2, col3 = st.columns([3, 4, 2])
+        col1.write(data_formatada)
+        col2.write(r["local"])
+        col3.button("🗑️ Excluir", key=r["id"], on_click=lambda doc_id=r["id"]: db.collection("agendamentos").document(doc_id).delete())
+
+# --- 6. TELA DE LOGIN ---
+
+def login():
+    st.title("🔐 Login")
+    with st.form("login_form"):
+        email = st.text_input("Email")
+        senha = st.text_input("Senha", type="password")
+        submit = st.form_submit_button("Entrar")
+        if submit:
+            user = sign_in(email, senha)
+            if user:
+                st.session_state.logged_in = True
+                st.session_state.uid = user["localId"]
+                st.rerun()
             else:
-                st.info("Nenhum agendamento para este local ainda.")
+                st.error("Email ou senha inválidos.")
 
-# --- PONTO DE ENTRADA ---
+# --- 7. PÁGINA PRINCIPAL ---
 
-if __name__ == "__main__":
-    main()
+def main_app():
+    st.title("Sistema de Gestão de Laudos")
+    exibir_calendario()
+
+    st.markdown("---")
+    st.subheader("🏛️ Locais de Perícia")
+    if st.button("🔍 Ver agendamentos da 17ª Vara Federal - Juazeiro"):
+        visualizar_local("17ª Vara Federal - Juazeiro")
+
+    # Caso tenha clicado em uma data do calendário
+    query_params = st.experimental_get_query_params()
+    if "dia" in query_params:
+        data_str = query_params["dia"][0]
+        try:
+            data_dt = datetime.datetime.strptime(data_str, "%Y-%m-%d")
+            agendar_para_dia(data_dt)
+        except:
+            st.warning("Data inválida na URL.")
+
+# --- 8. PONTO DE ENTRADA ---
+
+if 'logged_in' not in st.session_state:
+    st.session_state.logged_in = False
+
+if not st.session_state.logged_in:
+    login()
+else:
+    main_app()
