@@ -1,4 +1,3 @@
-
 # Meu Perito - Sistema de Gestão de Laudos
 # Versão ajustada sem uso de locale.setlocale
 
