@@ -1,224 +1,218 @@
-# Meu Perito - Sistema de Gestão de Laudos
-# Versão 7.2.1: Adiciona salvamento de agendamento com local e data no Firestore
-
 import streamlit as st
-import firebase_admin
-from firebase_admin import credentials, firestore, auth
 import datetime
-import requests
-import json
-import base64
+import uuid # Para gerar IDs únicos para agendamentos e locais
 
-# --- 1. CONFIGURAÇÃO E INICIALIZAÇÃO ---
+# --- Configurações Iniciais e Dados Hardcoded (DEMONSTRATIVOS) ---
+# 🚨 ATENÇÃO: CREDENCIAIS HARDCODED. NÃO USE EM PRODUÇÃO!
+# Para um sistema real, estas credenciais viriam de um backend seguro e banco de dados.
+DEMO_USERS = {
+    "dr.hyttallo": {"password": "admin_password", "role": "admin"},
+    "assistente1": {"password": "assistant_password", "role": "assistant"},
+    "assistente2": {"password": "assistant_password", "role": "assistant"},
+}
 
-def init_firebase():
-    """Inicializa o Firebase Admin SDK se ainda não foi inicializado."""
-    if not firebase_admin._apps:
-        try:
-            creds_base64 = st.secrets["FIREBASE_CREDENTIALS_BASE64"]
-            creds_json_str = base64.b64decode(creds_base64).decode("utf-8")
-            creds_dict = json.loads(creds_json_str)
-            creds = credentials.Certificate(creds_dict)
-            firebase_admin.initialize_app(creds)
-        except Exception as e:
-            st.error(f"Erro ao inicializar o Firebase: {e}")
-            st.stop()
-    return firestore.client()
+# 🚨 ATENÇÃO: LOCAIS HARDCODED. Em um sistema real, seriam gerenciados via backend.
+LOCATIONS = [
+    {"id": str(uuid.uuid4()), "name": "17ª Vara Federal", "city": "Juazeiro do Norte"},
+    {"id": str(uuid.uuid4()), "name": "20ª Vara Federal", "city": "Salgueiro"},
+    {"id": str(uuid.uuid4()), "name": "25ª Vara Federal", "city": "Iguatu"},
+    {"id": str(uuid.uuid4()), "name": "27ª Vara Federal", "city": "Ouricuri"},
+    {"id": str(uuid.uuid4()), "name": "15ª Vara Federal", "city": "Sousa"},
+    {"id": str(uuid.uuid4()), "name": "Estaduais (Diversas varas)", "city": "Diversas"}
+]
 
-# --- 2. AUTENTICAÇÃO ---
-
-def sign_in(email, password):
-    """Autentica um usuário com Firebase."""
-    api_key = st.secrets["FIREBASE_WEB_API_KEY"]
-    url = f"https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key={api_key}"
-    payload = json.dumps({"email": email, "password": password, "returnSecureToken": True})
-    try:
-        res = requests.post(url, data=payload)
-        res.raise_for_status()
-        return res.json()
-    except requests.exceptions.HTTPError:
-        st.error("Email ou senha inválidos.")
-        return None
-    except Exception as e:
-        st.error(f"Erro de conexão: {e}")
-        return None
-
-def change_password(id_token, new_password):
-    api_key = st.secrets["FIREBASE_WEB_API_KEY"]
-    url = f"https://identitytoolkit.googleapis.com/v1/accounts:update?key={api_key}"
-    payload = json.dumps({"idToken": id_token, "password": new_password, "returnSecureToken": False})
-    try:
-        res = requests.post(url, data=payload)
-        res.raise_for_status()
-        return True
-    except Exception:
-        return False
-
-def get_user_data(uid):
-    db = init_firebase()
-    doc_ref = db.collection('users').document(uid)
-    doc = doc_ref.get()
-    if doc.exists:
-        return doc.to_dict()
-    try:
-        user = auth.get_user(uid)
-        data = {
-            'email': user.email,
-            'display_name': "Hyttallo Carneiro",
-            'role': 'Administrador',
-            'first_login': True
-        }
-        doc_ref.set(data)
-        return data
-    except Exception as e:
-        st.error(f"Erro ao obter dados do usuário: {e}")
-        return None
-
-def register_user(email, password, display_name, role='Assistente'):
-    try:
-        user = auth.create_user(email=email, password=password, display_name=display_name)
-        db = init_firebase()
-        db.collection('users').document(user.uid).set({
-            'email': email,
-            'display_name': display_name,
-            'role': role,
-            'first_login': True
-        })
-        st.success(f"Usuário '{display_name}' criado com sucesso!")
-        return True
-    except Exception as e:
-        st.error(f"Erro ao criar usuário: {e}")
-        return False
-
-# --- 3. SALVAR AGENDAMENTO ---
-
-def salvar_agendamento(uid, local, data):
-    """Salva o agendamento da perícia no Firestore."""
-    try:
-        db = init_firebase()
-        agendamento = {
-            "usuario_id": uid,
-            "local": local,
-            "data": data.strftime("%Y-%m-%d"),
-            "timestamp": firestore.SERVER_TIMESTAMP
-        }
-        db.collection("agendamentos").add(agendamento)
-        return True
-    except Exception as e:
-        st.error(f"Erro ao salvar agendamento: {e}")
-        return False
-
-# --- 4. TELAS DO SISTEMA ---
-
-def render_login_screen():
-    st.set_page_config(layout="centered")
-    st.markdown("""
-        <style>
-        .title { font-family: 'Garamond', serif; font-style: italic; font-size: 48px; text-align: center; color: #2E4053; }
-        </style>
-        <h1 class="title">Meu Perito</h1>
-    """, unsafe_allow_html=True)
-    
-    with st.form("login_form"):
-        email = st.text_input("Email")
-        password = st.text_input("Senha", type="password")
-        submitted = st.form_submit_button("Entrar")
-
-        if submitted:
-            user_info = sign_in(email, password)
-            if user_info:
-                st.session_state.logged_in = True
-                st.session_state.uid = user_info['localId']
-                st.session_state.id_token = user_info['idToken']
-                user_data = get_user_data(st.session_state.uid)
-                if user_data:
-                    st.session_state.user_name = user_data.get('display_name')
-                    st.session_state.user_role = user_data.get('role')
-                    st.session_state.force_password_change = user_data.get('first_login', False)
-                    st.rerun()
-
-def render_password_change_screen():
-    st.title("Alterar Senha Inicial")
-    with st.form("password_change_form"):
-        new_password = st.text_input("Nova Senha", type="password")
-        confirm = st.text_input("Confirmar Nova Senha", type="password")
-        if st.form_submit_button("Alterar Senha e Continuar"):
-            if new_password == confirm and len(new_password) >= 6:
-                if change_password(st.session_state.id_token, new_password):
-                    db = init_firebase()
-                    db.collection('users').document(st.session_state.uid).update({'first_login': False})
-                    st.session_state.force_password_change = False
-                    st.success("Senha alterada com sucesso!")
-                    st.rerun()
-                else:
-                    st.error("Erro ao alterar senha.")
-            else:
-                st.error("Senhas devem coincidir e ter pelo menos 6 caracteres.")
-
-def render_main_app():
-    st.set_page_config(layout="wide")
-
-    col1, col2 = st.columns([4, 1])
-    with col1:
-        st.title("Sistema de Gestão de Laudos")
-    with col2:
-        st.write(f"Usuário: **{st.session_state.user_name}**")
-        st.write(f"Perfil: *{st.session_state.user_role}*")
-        if st.button("Sair"):
-            for key in list(st.session_state.keys()):
-                del st.session_state[key]
-            st.rerun()
-    
-    st.divider()
-
-    if st.session_state.user_role == 'Administrador':
-        with st.expander("Painel de Administração"):
-            st.subheader("Gestão de Usuários")
-            with st.form("create_user_form", clear_on_submit=True):
-                st.write("**Criar Novo Usuário (Assistente)**")
-                col_a, col_b, col_c = st.columns([2,2,1])
-                new_email = col_a.text_input("Email")
-                new_name = col_b.text_input("Nome")
-                if col_c.form_submit_button("Criar"):
-                    if new_email and new_name:
-                        register_user(new_email, "123456", new_name)
-                    else:
-                        st.warning("Preencha o email e o nome.")
-            st.divider()
-
-    if 'view' not in st.session_state:
-        st.session_state.view = 'home'
-
-    if st.session_state.view == 'home':
-        st.header("Selecione o Local da Perícia")
-        if st.button("17ª Vara Federal - Juazeiro", use_container_width=True):
-            st.session_state.view = 'date_selection'
-            st.rerun()
-
-    elif st.session_state.view == 'date_selection':
-        st.header("Agendamento da Perícia")
-
-        local_escolhido = "17ª Vara Federal - Juazeiro"
-        selected_date = st.date_input("📅 Data da perícia:", datetime.date.today(), format="DD/MM/YYYY")
-
-        if st.button("✅ Confirmar Agendamento", use_container_width=True):
-            if salvar_agendamento(st.session_state.uid, local_escolhido, selected_date):
-                st.success(f"Agendamento salvo com sucesso para {selected_date.strftime('%d/%m/%Y')} no local: {local_escolhido}")
-            else:
-                st.error("Erro ao salvar o agendamento.")
-
-        if st.button("🔙 Voltar"):
-            st.session_state.view = 'home'
-            st.rerun()
-
-# --- 5. INÍCIO DO APLICATIVO ---
-
-if 'logged_in' not in st.session_state:
+# Inicialização das variáveis de estado de sessão do Streamlit
+# Usamos session_state para manter o estado do app enquanto o usuário interage.
+if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
+if "username" not in st.session_state:
+    st.session_state.username = None
+if "user_role" not in st.session_state:
+    st.session_state.user_role = None
+if "appointments" not in st.session_state:
+    # Lista de dicionários para armazenar agendamentos:
+    # [{"id": "...", "date": "...", "location_id": "...", "location_name": "...", "description": "..."}]
+    st.session_state.appointments = []
 
+# --- Funções de Autenticação (DEMONSTRATIVAS) ---
+def login():
+    username = st.session_state.login_username
+    password = st.session_state.login_password
+    if username in DEMO_USERS and DEMO_USERS[username]["password"] == password:
+        st.session_state.logged_in = True
+        st.session_state.username = username
+        st.session_state.user_role = DEMO_USERS[username]["role"]
+        st.success(f"Bem-vindo(a), {username.capitalize()}!")
+        st.rerun() # Reinicia o app para ir para a tela principal
+    else:
+        st.error("Usuário ou senha inválidos.")
+
+def logout():
+    st.session_state.logged_in = False
+    st.session_state.username = None
+    st.session_state.user_role = None
+    st.success("Sessão encerrada.")
+    st.rerun() # Reinicia o app para voltar para a tela de login
+
+# --- Configuração da Página do Streamlit ---
+st.set_page_config(
+    page_title="Meu Perito - Sistema de Gerenciamento de Perícias",
+    layout="wide", # Layout wide usa a largura total da tela
+    initial_sidebar_state="expanded"
+)
+
+# --- Aviso de Segurança Importante ---
+st.info("""
+    **🚨 AVISO IMPORTANTE: CÓDIGO DEMONSTRATIVO PARA FLUXO DE UI ��**
+
+    Este código `app.py` é uma **DEMONSTRAÇÃO VISUAL E FUNCIONAL** das suas solicitações,
+    focando na interface de usuário (UI) e no fluxo de interação.
+
+    **NÃO É SEGURO NEM ROBUSTO PARA USO EM PRODUÇÃO COM DADOS REAIS.**
+
+    *   **Autenticação:** Credenciais hardcoded, sem hashing de senha.
+    *   **Persistência de Dados:** Agendamentos armazenados apenas na sessão atual, **perdidos ao reiniciar o aplicativo**.
+    *   **Autorização:** Lógica de permissões (admin/assistente) muito simplificada.
+
+    Para um sistema real com dados sensíveis, é **INDISPENSÁVEL** a implementação de um **BACKEND DEDICADO**
+    (com um framework como Django ou Flask, e um banco de dados como PostgreSQL) para gerenciar
+    usuários, senhas criptografadas e persistência segura dos dados.
+""")
+
+# --- Lógica Principal do Aplicativo ---
+
+# 1º) Módulo de Autenticação: Exigir usuário e senha
 if not st.session_state.logged_in:
-    render_login_screen()
-elif st.session_state.get('force_password_change', False):
-    render_password_change_screen()
+    st.title("🔐 Acesso ao Sistema Meu Perito")
+    st.write("Por favor, insira suas credenciais para acessar o sistema.")
+    with st.form("login_form", clear_on_submit=False):
+        st.text_input("Usuário", key="login_username", help="Ex: dr.hyttallo ou assistente1")
+        st.text_input("Senha", type="password", key="login_password", help="Ex: admin_password ou assistant_password")
+        st.form_submit_button("Entrar", on_click=login)
 else:
-    render_main_app()
+    # Usuário logado, exibe o aplicativo principal
+    st.sidebar.title(f"Olá, Dr. {st.session_state.username.capitalize()} 👋")
+    st.sidebar.write(f"**Perfil:** {st.session_state.user_role.capitalize()}")
+    st.sidebar.button("Sair", on_click=logout, type="secondary")
+
+    st.title("✨ Meu Perito: Gerenciamento de Agendamentos e Laudos")
+
+    # 2º) Calendário e Inclusão de Perícias
+    st.header("��️ Agendar Nova Perícia")
+    today = datetime.date.today()
+    
+    # Campo para selecionar a data da perícia
+    selected_date_for_add = st.date_input(
+        "Selecione a data da perícia a ser agendada",
+        today,
+        help="Use este seletor para escolher o dia do agendamento."
+    )
+
+    # Exemplo conceitual de calendário mensal (Streamlit não tem uma grade de calendário nativa)
+    st.subheader(f"Visão do Mês: {selected_date_for_add.strftime('%B de %Y')}")
+    st.markdown(f"> **Dia Selecionado para Agendamento:** {selected_date_for_add.strftime('%d/%m/%Y')}")
+    st.markdown("---")
+
+    with st.form("add_appointment_form", clear_on_submit=True):
+        st.subheader("📝 Detalhes da Perícia")
+        
+        # Seleção do local da perícia
+        selected_location_name = st.selectbox(
+            "Local da Perícia",
+            options=[loc["name"] for loc in LOCATIONS],
+            key="appointment_location",
+            help="Escolha um dos locais de atuação."
+        )
+        
+        description = st.text_area(
+            "Observações da Perícia (opcional)",
+            placeholder="Ex: Nome do periciado, tipo de perícia, observações relevantes...",
+            key="appointment_description",
+            height=100
+        )
+
+        if st.form_submit_button("Adicionar Perícia"):
+            # Encontra o ID do local selecionado
+            selected_location_id = next(loc["id"] for loc in LOCATIONS if loc["name"] == selected_location_name)
+
+            new_appointment = {
+                "id": str(uuid.uuid4()), # ID único para este agendamento
+                "date": selected_date_for_add.isoformat(), # Armazena data como string ISO para compatibilidade
+                "location_id": selected_location_id,
+                "location_name": selected_location_name, # Armazena o nome para facilitar exibição
+                "description": description if description else "Nenhuma observação."
+            }
+            st.session_state.appointments.append(new_appointment)
+            st.success(f"✅ Perícia agendada para {selected_date_for_add.strftime('%d/%m/%Y')} em **{selected_location_name}**.")
+
+    st.markdown("---")
+
+    # 3º) Exposição dos Locais de Atuação
+    st.header("🌍 Meus Locais de Atuação")
+    st.write("Estes são os locais onde o Dr. Hyttallo realiza perícias:")
+
+    # Exibição dos locais em colunas para melhor organização
+    cols = st.columns(3) # Cria 3 colunas
+    for i, loc in enumerate(LOCATIONS):
+        with cols[i % 3]: # Distribui os locais pelas colunas
+            st.markdown(f"- **{loc['name']}**")
+            if loc['city']:
+                st.markdown(f"  *{loc['city']}*")
+    st.markdown("---")
+
+    # 4º) Listagem e Filtragem de Perícias
+    st.header("�� Próximas Perícias Agendadas")
+
+    # Opções de filtro para o local
+    all_locations_option = "Todos os Locais"
+    filter_location_name = st.selectbox(
+        "Filtrar Perícias por Local",
+        options=[all_locations_option] + [loc["name"] for loc in LOCATIONS],
+        key="filter_location_select",
+        help="Selecione um local para ver as perícias específicas."
+    )
+    
+    # Campo para filtrar por data (a partir de hoje)
+    filter_start_date = st.date_input(
+        "Ver perícias a partir de:",
+        datetime.date.today(),
+        help="As perícias serão listadas a partir desta data."
+    )
+
+    # Filtra os agendamentos
+    filtered_appointments = []
+    
+    for appt in st.session_state.appointments:
+        appt_date_obj = datetime.date.fromisoformat(appt["date"])
+        
+        # Filtra por data: apenas agendamentos a partir da data de filtro
+        if appt_date_obj >= filter_start_date:
+            # Filtra por local (se "Todos os Locais" não estiver selecionado)
+            if filter_location_name == all_locations_option or appt["location_name"] == filter_location_name:
+                filtered_appointments.append(appt)
+
+    # Ordena os agendamentos por data para melhor visualização
+    filtered_appointments.sort(key=lambda x: x["date"])
+
+    if filtered_appointments:
+        st.subheader(f"Perícias Encontradas ({len(filtered_appointments)}):")
+        for appt in filtered_appointments:
+            date_obj = datetime.date.fromisoformat(appt["date"])
+            
+            # Exibe os detalhes da perícia
+            st.markdown(f"**🗓️ Data:** {date_obj.strftime('%d/%m/%Y')} | **📍 Local:** {appt['location_name']}")
+            st.markdown(f"  **Observações:** {appt['description']}")
+            
+            # Botão de exclusão (visível apenas para administradores)
+            if st.session_state.user_role == "admin":
+                if st.button(
+                    f"Excluir Perícia ({date_obj.strftime('%d/%m/%Y')} - {appt['location_name']})",
+                    key=f"delete_btn_{appt['id']}",
+                    type="secondary"
+                ):
+                    st.session_state.appointments.remove(appt)
+                    st.success("🗑️ Perícia excluída com sucesso.")
+                    st.rerun() # Recarrega a página para atualizar a lista
+            st.markdown("---")
+    else:
+        st.info("Nenhuma perícia agendada para os filtros selecionados ou no futuro. Comece agendando uma acima!")
