@@ -3,6 +3,7 @@ import pandas as pd
 import calendar
 from datetime import datetime, date
 import json
+import locale
 
 # Configuração da página
 st.set_page_config(
@@ -11,6 +12,25 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded"
 )
+
+# Configurar locale para português (se disponível)
+try:
+    locale.setlocale(locale.LC_TIME, 'pt_BR.UTF-8')
+except:
+    try:
+        locale.setlocale(locale.LC_TIME, 'Portuguese_Brazil.1252')
+    except:
+        pass
+
+# Nomes dos meses em português
+MESES_PT = {
+    1: "Janeiro", 2: "Fevereiro", 3: "Março", 4: "Abril",
+    5: "Maio", 6: "Junho", 7: "Julho", 8: "Agosto",
+    9: "Setembro", 10: "Outubro", 11: "Novembro", 12: "Dezembro"
+}
+
+# Dias da semana em português
+DIAS_SEMANA_PT = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom']
 
 # Locais de atuação
 LOCAIS_ATUACAO = [
@@ -21,6 +41,26 @@ LOCAIS_ATUACAO = [
     "15ª Vara Federal (Sousa)",
     "Estaduais (Diversas varas)"
 ]
+
+def format_date_br(date_str):
+    """Converte data de YYYY-MM-DD para DD-MM-YYYY"""
+    if isinstance(date_str, str) and len(date_str) == 10:
+        year, month, day = date_str.split('-')
+        return f"{day}-{month}-{year}"
+    return date_str
+
+def format_date_iso(date_str):
+    """Converte data de DD-MM-YYYY para YYYY-MM-DD"""
+    if isinstance(date_str, str) and len(date_str) == 10 and '-' in date_str:
+        parts = date_str.split('-')
+        if len(parts) == 3:
+            # Se já está no formato DD-MM-YYYY
+            if len(parts[0]) == 2:
+                return f"{parts[2]}-{parts[1]}-{parts[0]}"
+            # Se está no formato YYYY-MM-DD
+            else:
+                return date_str
+    return date_str
 
 # Função para inicializar dados na sessão
 def init_session_data():
@@ -54,16 +94,15 @@ def authenticate_user(username, password):
     return None
 
 def create_calendar_view(year, month):
-    """Cria visualização do calendário"""
+    """Cria visualização do calendário em português"""
     cal = calendar.monthcalendar(year, month)
-    month_name = calendar.month_name[month]
+    month_name = MESES_PT[month]
     
     st.subheader(f"📅 {month_name} {year}")
     
-    # Cabeçalho dos dias da semana
-    days = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom']
+    # Cabeçalho dos dias da semana em português
     cols = st.columns(7)
-    for i, day in enumerate(days):
+    for i, day in enumerate(DIAS_SEMANA_PT):
         cols[i].markdown(f"**{day}**")
     
     # Dias do mês
@@ -119,9 +158,7 @@ def main():
                     else:
                         st.error("❌ Usuário ou senha incorretos!")
         
-        # Informações do sistema
-        st.markdown("---")
-        st.info("💡 **Usuário padrão:** admin | **Senha:** admin123")
+        # Removido: Informações do sistema com credenciais expostas
         
     else:
         # Interface principal após login
@@ -141,9 +178,15 @@ def main():
         
         st.markdown("---")
         
-        # Sidebar para administração
-        if user_info['role'] == 'administrador':
-            with st.sidebar:
+        # Sidebar para administração e configurações
+        with st.sidebar:
+            st.markdown("### ⚙️ Configurações")
+            
+            # Opção para mudar senha (disponível para todos)
+            if st.button("🔑 Mudar Senha"):
+                st.session_state.show_change_password = True
+            
+            if user_info['role'] == 'administrador':
                 st.markdown("### 🛠️ Administração")
                 
                 if st.button("👥 Gerenciar Usuários"):
@@ -151,6 +194,40 @@ def main():
                 
                 if st.button("📊 Relatórios"):
                     st.session_state.show_reports = True
+        
+        # Formulário para mudar senha
+        if st.session_state.get('show_change_password', False):
+            st.markdown("### 🔑 Alterar Senha")
+            
+            with st.form("change_password"):
+                col1, col2 = st.columns(2)
+                with col1:
+                    current_password = st.text_input("Senha Atual", type="password")
+                    new_password = st.text_input("Nova Senha", type="password")
+                with col2:
+                    confirm_password = st.text_input("Confirmar Nova Senha", type="password")
+                
+                col1, col2 = st.columns(2)
+                with col1:
+                    if st.form_submit_button("✅ Alterar Senha", type="primary"):
+                        if current_password == st.session_state.users[st.session_state.username]["password"]:
+                            if new_password == confirm_password:
+                                if len(new_password) >= 6:
+                                    st.session_state.users[st.session_state.username]["password"] = new_password
+                                    st.success("✅ Senha alterada com sucesso!")
+                                    st.session_state.show_change_password = False
+                                    st.rerun()
+                                else:
+                                    st.error("❌ A nova senha deve ter pelo menos 6 caracteres!")
+                            else:
+                                st.error("❌ As senhas não coincidem!")
+                        else:
+                            st.error("❌ Senha atual incorreta!")
+                
+                with col2:
+                    if st.form_submit_button("❌ Cancelar"):
+                        st.session_state.show_change_password = False
+                        st.rerun()
         
         # Gerenciamento de usuários (apenas admin)
         if user_info['role'] == 'administrador' and st.session_state.get('show_user_management', False):
@@ -165,12 +242,15 @@ def main():
                     
                     if st.form_submit_button("Criar Usuário"):
                         if new_username not in st.session_state.users:
-                            st.session_state.users[new_username] = {
-                                "password": new_password,
-                                "role": new_role,
-                                "name": new_name
-                            }
-                            st.success(f"✅ Usuário {new_username} criado com sucesso!")
+                            if len(new_password) >= 6:
+                                st.session_state.users[new_username] = {
+                                    "password": new_password,
+                                    "role": new_role,
+                                    "name": new_name
+                                }
+                                st.success(f"✅ Usuário {new_username} criado com sucesso!")
+                            else:
+                                st.error("❌ A senha deve ter pelo menos 6 caracteres!")
                         else:
                             st.error("❌ Usuário já existe!")
             
@@ -199,7 +279,7 @@ def main():
                     "Mês",
                     range(1, 13),
                     index=today.month - 1,
-                    format_func=lambda x: calendar.month_name[x]
+                    format_func=lambda x: MESES_PT[x]
                 )
                 selected_year = st.selectbox(
                     "Ano",
@@ -213,7 +293,8 @@ def main():
             # Formulário para adicionar perícia na data selecionada
             if st.session_state.selected_date:
                 st.markdown("---")
-                st.markdown(f"### 📝 Agendar Perícia - {st.session_state.selected_date}")
+                date_formatted = format_date_br(st.session_state.selected_date)
+                st.markdown(f"### 📝 Agendar Perícia - {date_formatted}")
                 
                 with st.form("add_pericia"):
                     col1, col2 = st.columns(2)
@@ -261,7 +342,7 @@ def main():
                 for data, info in st.session_state.pericias.items():
                     if info['local'] == st.session_state.filtro_local:
                         pericias_filtradas.append({
-                            'Data': data,
+                            'Data': format_date_br(data),
                             'Horário': info['hora'],
                             'Local': info['local'],
                             'Observações': info.get('observacoes', '')
@@ -269,7 +350,9 @@ def main():
                 
                 if pericias_filtradas:
                     df = pd.DataFrame(pericias_filtradas)
-                    df = df.sort_values('Data')
+                    # Ordenar por data (convertendo de volta para ISO para ordenação)
+                    df['Data_Sort'] = df['Data'].apply(format_date_iso)
+                    df = df.sort_values('Data_Sort').drop('Data_Sort', axis=1)
                     st.dataframe(df, use_container_width=True)
                 else:
                     st.info("Nenhuma perícia agendada para este local.")
@@ -287,7 +370,7 @@ def main():
                 pericias_list = []
                 for data, info in st.session_state.pericias.items():
                     pericias_list.append({
-                        'Data': data,
+                        'Data': format_date_br(data),
                         'Horário': info['hora'],
                         'Local': info['local'],
                         'Observações': info.get('observacoes', ''),
@@ -295,7 +378,9 @@ def main():
                     })
                 
                 df = pd.DataFrame(pericias_list)
-                df = df.sort_values('Data', ascending=False)
+                # Ordenar por data
+                df['Data_Sort'] = df['Data'].apply(format_date_iso)
+                df = df.sort_values('Data_Sort', ascending=False).drop('Data_Sort', axis=1)
                 
                 # Filtros
                 col1, col2 = st.columns(2)
@@ -315,21 +400,37 @@ def main():
                     df_filtrado = df_filtrado[df_filtrado['Local'] == filtro_local_geral]
                 
                 if filtro_data:
-                    df_filtrado = df_filtrado[df_filtrado['Data'] >= str(filtro_data)]
+                    filtro_data_str = filtro_data.strftime("%d-%m-%Y")
+                    df_filtrado['Data_Compare'] = df_filtrado['Data'].apply(format_date_iso)
+                    filtro_data_iso = format_date_iso(filtro_data_str)
+                    df_filtrado = df_filtrado[df_filtrado['Data_Compare'] >= filtro_data_iso]
+                    df_filtrado = df_filtrado.drop('Data_Compare', axis=1)
                 
                 st.dataframe(df_filtrado, use_container_width=True)
                 
                 # Opção para deletar perícias (apenas admin)
                 if user_info['role'] == 'administrador':
                     st.markdown("#### 🗑️ Remover Perícia")
-                    data_remover = st.selectbox(
-                        "Selecione a data para remover",
-                        [""] + list(st.session_state.pericias.keys())
+                    
+                    # Criar lista de opções com datas formatadas
+                    opcoes_remover = [""]
+                    for data in st.session_state.pericias.keys():
+                        data_br = format_date_br(data)
+                        local = st.session_state.pericias[data]['local']
+                        opcoes_remover.append(f"{data_br} - {local}")
+                    
+                    data_remover_display = st.selectbox(
+                        "Selecione a perícia para remover",
+                        opcoes_remover
                     )
                     
-                    if data_remover and st.button("🗑️ Confirmar Remoção", type="secondary"):
-                        if data_remover in st.session_state.pericias:
-                            del st.session_state.pericias[data_remover]
+                    if data_remover_display and st.button("🗑️ Confirmar Remoção", type="secondary"):
+                        # Extrair a data original da opção selecionada
+                        data_br = data_remover_display.split(' - ')[0]
+                        data_iso = format_date_iso(data_br)
+                        
+                        if data_iso in st.session_state.pericias:
+                            del st.session_state.pericias[data_iso]
                             st.success("✅ Perícia removida com sucesso!")
                             st.rerun()
             else:
