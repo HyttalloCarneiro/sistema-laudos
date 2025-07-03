@@ -32,14 +32,13 @@ MESES_PT = {
 # Dias da semana em português
 DIAS_SEMANA_PT = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom']
 
-# Locais de atuação
-LOCAIS_ATUACAO = [
+# Locais de atuação federais (fixos)
+LOCAIS_FEDERAIS = [
     "17ª Vara Federal (Juazeiro do Norte)",
     "20ª Vara Federal (Salgueiro)",
     "25ª Vara Federal (Iguatu)",
     "27ª Vara Federal (Ouricuri)",
-    "15ª Vara Federal (Sousa)",
-    "Estaduais (Diversas varas)"
+    "15ª Vara Federal (Sousa)"
 ]
 
 # Permissões padrão para assistentes
@@ -53,7 +52,8 @@ PERMISSOES_ASSISTENTE = {
     "alterar_propria_senha": True,
     "visualizar_locais": True,
     "gerenciar_usuarios": False,
-    "acessar_configuracoes_avancadas": False
+    "acessar_configuracoes_avancadas": False,
+    "gerenciar_locais_estaduais": False
 }
 
 def format_date_br(date_str):
@@ -92,6 +92,9 @@ def init_session_data():
     if 'pericias' not in st.session_state:
         st.session_state.pericias = {}
     
+    if 'locais_estaduais' not in st.session_state:
+        st.session_state.locais_estaduais = []
+    
     if 'authenticated' not in st.session_state:
         st.session_state.authenticated = False
     
@@ -106,6 +109,12 @@ def init_session_data():
     
     if 'show_change_password' not in st.session_state:
         st.session_state.show_change_password = False
+    
+    if 'current_local_filter' not in st.session_state:
+        st.session_state.current_local_filter = None
+    
+    if 'show_estaduais_management' not in st.session_state:
+        st.session_state.show_estaduais_management = False
 
 def authenticate_user(username, password):
     """Autentica usuário"""
@@ -121,6 +130,10 @@ def has_permission(user_info, permission):
     
     user_permissions = user_info.get('permissoes', PERMISSOES_ASSISTENTE)
     return user_permissions.get(permission, False)
+
+def get_all_locais():
+    """Retorna todos os locais (federais + estaduais)"""
+    return LOCAIS_FEDERAIS + st.session_state.locais_estaduais
 
 def create_calendar_view(year, month):
     """Cria visualização do calendário em português"""
@@ -157,6 +170,71 @@ def create_calendar_view(year, month):
                 else:
                     if cols[i].button(f"{day}", key=f"day_{date_str}", use_container_width=True):
                         st.session_state.selected_date = date_str
+
+def show_local_specific_view(local_name):
+    """Mostra visualização específica de um local"""
+    st.markdown(f"## 📍 {local_name}")
+    st.markdown("---")
+    
+    # Filtrar perícias deste local
+    pericias_local = []
+    for data, info in st.session_state.pericias.items():
+        if info['local'] == local_name:
+            pericias_local.append({
+                'Data': format_date_br(data),
+                'Local': info['local'],
+                'Observações': info.get('observacoes', ''),
+                'Criado por': info.get('criado_por', 'N/A'),
+                'Data_Sort': data
+            })
+    
+    if pericias_local:
+        # Separar por futuras e passadas
+        hoje = datetime.now().date()
+        
+        futuras = []
+        passadas = []
+        
+        for pericia in pericias_local:
+            data_pericia = datetime.strptime(pericia['Data_Sort'], '%Y-%m-%d').date()
+            if data_pericia >= hoje:
+                futuras.append(pericia)
+            else:
+                passadas.append(pericia)
+        
+        # Mostrar perícias futuras
+        if futuras:
+            st.markdown("### 📅 Perícias Agendadas")
+            df_futuras = pd.DataFrame(futuras)
+            df_futuras = df_futuras.sort_values('Data_Sort')
+            df_futuras = df_futuras.drop('Data_Sort', axis=1)
+            st.dataframe(df_futuras, use_container_width=True)
+        
+        # Mostrar perícias passadas
+        if passadas:
+            st.markdown("### 📋 Histórico de Perícias")
+            df_passadas = pd.DataFrame(passadas)
+            df_passadas = df_passadas.sort_values('Data_Sort', ascending=False)
+            df_passadas = df_passadas.drop('Data_Sort', axis=1)
+            st.dataframe(df_passadas, use_container_width=True)
+    else:
+        st.info(f"📭 Nenhuma perícia agendada para {local_name}")
+    
+    # Estatísticas do local
+    st.markdown("### 📊 Estatísticas")
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        total_pericias = len(pericias_local)
+        st.metric("Total de Perícias", total_pericias)
+    
+    with col2:
+        futuras_count = len([p for p in pericias_local if datetime.strptime(p['Data_Sort'], '%Y-%m-%d').date() >= hoje])
+        st.metric("Perícias Futuras", futuras_count)
+    
+    with col3:
+        passadas_count = len([p for p in pericias_local if datetime.strptime(p['Data_Sort'], '%Y-%m-%d').date() < hoje])
+        st.metric("Perícias Realizadas", passadas_count)
 
 def main():
     """Função principal do aplicativo"""
@@ -203,11 +281,13 @@ def main():
                 st.session_state.user_info = None
                 st.session_state.show_user_management = False
                 st.session_state.show_change_password = False
+                st.session_state.current_local_filter = None
+                st.session_state.show_estaduais_management = False
                 st.rerun()
         
         st.markdown("---")
         
-        # Sidebar para configurações
+        # Sidebar melhorada
         with st.sidebar:
             st.markdown("### ⚙️ Configurações")
             
@@ -215,14 +295,98 @@ def main():
             if has_permission(user_info, 'alterar_propria_senha'):
                 if st.button("🔑 Mudar Senha"):
                     st.session_state.show_change_password = not st.session_state.show_change_password
+                    st.session_state.current_local_filter = None
+            
+            # Botão para voltar ao calendário principal
+            if st.session_state.current_local_filter:
+                if st.button("🏠 Voltar ao Calendário Principal"):
+                    st.session_state.current_local_filter = None
+                    st.rerun()
+                st.markdown("---")
+            
+            # Locais de Atuação
+            st.markdown("### 🏛️ Locais de Atuação")
+            
+            # Locais Federais
+            st.markdown("#### ⚖️ Federais")
+            for local in LOCAIS_FEDERAIS:
+                if st.button(f"📍 {local.split('(')[0].strip()}", key=f"sidebar_{local}", use_container_width=True):
+                    st.session_state.current_local_filter = local
+                    st.session_state.show_user_management = False
+                    st.session_state.show_change_password = False
+                    st.session_state.show_estaduais_management = False
+                    st.rerun()
+            
+            # Locais Estaduais
+            st.markdown("#### 🏛️ Estaduais")
+            
+            # Botão para gerenciar locais estaduais (apenas admin)
+            if user_info['role'] == 'administrador':
+                if st.button("⚙️ Gerenciar Locais Estaduais", use_container_width=True):
+                    st.session_state.show_estaduais_management = not st.session_state.show_estaduais_management
+                    st.session_state.current_local_filter = None
+                    st.session_state.show_user_management = False
+                    st.session_state.show_change_password = False
+                    st.rerun()
+            
+            # Listar locais estaduais
+            if st.session_state.locais_estaduais:
+                for local in st.session_state.locais_estaduais:
+                    if st.button(f"📍 {local}", key=f"sidebar_estadual_{local}", use_container_width=True):
+                        st.session_state.current_local_filter = local
+                        st.session_state.show_user_management = False
+                        st.session_state.show_change_password = False
+                        st.session_state.show_estaduais_management = False
+                        st.rerun()
+            else:
+                st.info("Nenhum local estadual cadastrado")
             
             # Administração (apenas admin)
             if user_info['role'] == 'administrador':
+                st.markdown("---")
                 st.markdown("### 🛠️ Administração")
                 
                 # Toggle para gerenciamento de usuários
                 if st.button("👥 Gerenciar Usuários"):
                     st.session_state.show_user_management = not st.session_state.show_user_management
+                    st.session_state.current_local_filter = None
+                    st.session_state.show_estaduais_management = False
+        
+        # Gerenciamento de locais estaduais
+        if st.session_state.show_estaduais_management and user_info['role'] == 'administrador':
+            st.markdown("### 🏛️ Gerenciar Locais Estaduais")
+            
+            # Adicionar novo local estadual
+            with st.form("add_local_estadual"):
+                st.markdown("#### ➕ Adicionar Novo Local Estadual")
+                novo_local = st.text_input("Nome do Local")
+                
+                if st.form_submit_button("Adicionar Local"):
+                    if novo_local and novo_local not in st.session_state.locais_estaduais:
+                        st.session_state.locais_estaduais.append(novo_local)
+                        st.success(f"✅ Local '{novo_local}' adicionado com sucesso!")
+                        st.rerun()
+                    elif novo_local in st.session_state.locais_estaduais:
+                        st.error("❌ Este local já existe!")
+                    else:
+                        st.error("❌ Por favor, insira um nome para o local!")
+            
+            # Listar e gerenciar locais existentes
+            if st.session_state.locais_estaduais:
+                st.markdown("#### 📋 Locais Estaduais Cadastrados")
+                for i, local in enumerate(st.session_state.locais_estaduais):
+                    col1, col2 = st.columns([4, 1])
+                    with col1:
+                        st.write(f"📍 {local}")
+                    with col2:
+                        if st.button("🗑️", key=f"del_estadual_{i}"):
+                            st.session_state.locais_estaduais.remove(local)
+                            st.success(f"Local '{local}' removido!")
+                            st.rerun()
+            else:
+                st.info("📭 Nenhum local estadual cadastrado ainda.")
+            
+            st.markdown("---")
         
         # Formulário para mudar senha (aparece apenas quando ativado)
         if st.session_state.show_change_password:
@@ -294,6 +458,7 @@ def main():
                             perm_filtrar_pericias = st.checkbox("Usar filtros", value=True)
                             perm_visualizar_locais = st.checkbox("Ver locais de atuação", value=True)
                             perm_alterar_propria_senha = st.checkbox("Alterar própria senha", value=True)
+                            perm_gerenciar_locais_estaduais = st.checkbox("Gerenciar locais estaduais", value=False)
                     
                     if st.form_submit_button("Criar Usuário"):
                         if new_username not in st.session_state.users:
@@ -310,7 +475,8 @@ def main():
                                         "alterar_propria_senha": perm_alterar_propria_senha,
                                         "visualizar_locais": perm_visualizar_locais,
                                         "gerenciar_usuarios": False,
-                                        "acessar_configuracoes_avancadas": False
+                                        "acessar_configuracoes_avancadas": False,
+                                        "gerenciar_locais_estaduais": perm_gerenciar_locais_estaduais
                                     }
                                 else:
                                     permissoes = {}  # Admin tem todas as permissões
@@ -360,8 +526,13 @@ def main():
             
             st.markdown("---")
         
-        # Interface principal - só mostra se não estiver em modo de gerenciamento
-        if not st.session_state.show_user_management:
+        # Interface principal
+        if st.session_state.current_local_filter:
+            # Visualização específica do local
+            show_local_specific_view(st.session_state.current_local_filter)
+        
+        elif not st.session_state.show_user_management and not st.session_state.show_estaduais_management:
+            # Interface principal - calendário
             tab1, tab2 = st.tabs(["📅 Calendário e Perícias", "📋 Gerenciar Perícias"])
             
             with tab1:
@@ -391,19 +562,15 @@ def main():
                 with col1:
                     create_calendar_view(selected_year, selected_month)
                 
-                # Formulário para adicionar perícia na data selecionada
+                # Formulário simplificado para adicionar perícia na data selecionada
                 if st.session_state.selected_date and has_permission(user_info, 'agendar_pericias'):
                     st.markdown("---")
                     date_formatted = format_date_br(st.session_state.selected_date)
                     st.markdown(f"### 📝 Agendar Perícia - {date_formatted}")
                     
                     with st.form("add_pericia"):
-                        col1, col2 = st.columns(2)
-                        with col1:
-                            local_pericia = st.selectbox("Local da Perícia", LOCAIS_ATUACAO)
-                        with col2:
-                            hora_pericia = st.time_input("Horário", value=datetime.strptime("09:00", "%H:%M").time())
-                        
+                        # Apenas local e observações, sem horário
+                        local_pericia = st.selectbox("Local da Perícia", get_all_locais())
                         observacoes = st.text_area("Observações (opcional)")
                         
                         col1, col2 = st.columns(2)
@@ -411,7 +578,6 @@ def main():
                             if st.form_submit_button("✅ Confirmar Perícia", type="primary"):
                                 st.session_state.pericias[st.session_state.selected_date] = {
                                     "local": local_pericia,
-                                    "hora": hora_pericia.strftime("%H:%M"),
                                     "observacoes": observacoes,
                                     "criado_por": st.session_state.username,
                                     "criado_em": datetime.now().isoformat()
@@ -425,45 +591,29 @@ def main():
                                 st.session_state.selected_date = None
                                 st.rerun()
                 
-                # Locais de atuação
+                # Locais de atuação (mantido para compatibilidade)
                 if has_permission(user_info, 'visualizar_locais'):
                     st.markdown("---")
-                    st.markdown("### 🏛️ Locais de Atuação")
+                    st.markdown("### 🏛️ Acesso Rápido aos Locais")
                     
+                    # Federais
+                    st.markdown("#### ⚖️ Federais")
                     cols = st.columns(3)
-                    for i, local in enumerate(LOCAIS_ATUACAO):
+                    for i, local in enumerate(LOCAIS_FEDERAIS):
                         with cols[i % 3]:
-                            if st.button(f"📍 {local}", key=f"local_{i}", use_container_width=True):
-                                if has_permission(user_info, 'filtrar_pericias'):
-                                    st.session_state.filtro_local = local
-                
-                # Lista de perícias por local (se filtro ativo)
-                if st.session_state.get('filtro_local') and has_permission(user_info, 'filtrar_pericias'):
-                    st.markdown(f"### 📋 Perícias - {st.session_state.filtro_local}")
+                            if st.button(f"📍 {local.split('(')[0].strip()}", key=f"quick_{local}", use_container_width=True):
+                                st.session_state.current_local_filter = local
+                                st.rerun()
                     
-                    pericias_filtradas = []
-                    for data, info in st.session_state.pericias.items():
-                        if info['local'] == st.session_state.filtro_local:
-                            pericias_filtradas.append({
-                                'Data': format_date_br(data),
-                                'Horário': info['hora'],
-                                'Local': info['local'],
-                                'Observações': info.get('observacoes', '')
-                            })
-                    
-                    if pericias_filtradas:
-                        df = pd.DataFrame(pericias_filtradas)
-                        # Ordenar por data
-                        df['Data_Sort'] = df['Data'].apply(format_date_iso)
-                        df = df.sort_values('Data_Sort').drop('Data_Sort', axis=1)
-                        st.dataframe(df, use_container_width=True)
-                    else:
-                        st.info("Nenhuma perícia agendada para este local.")
-                    
-                    if st.button("🔄 Limpar Filtro"):
-                        if 'filtro_local' in st.session_state:
-                            del st.session_state.filtro_local
-                        st.rerun()
+                    # Estaduais
+                    if st.session_state.locais_estaduais:
+                        st.markdown("#### 🏛️ Estaduais")
+                        cols = st.columns(3)
+                        for i, local in enumerate(st.session_state.locais_estaduais):
+                            with cols[i % 3]:
+                                if st.button(f"📍 {local}", key=f"quick_estadual_{local}", use_container_width=True):
+                                    st.session_state.current_local_filter = local
+                                    st.rerun()
             
             with tab2:
                 # Verificar permissão para visualizar todas as perícias
@@ -479,7 +629,6 @@ def main():
                     for data, info in st.session_state.pericias.items():
                         pericias_list.append({
                             'Data': format_date_br(data),
-                            'Horário': info['hora'],
                             'Local': info['local'],
                             'Observações': info.get('observacoes', ''),
                             'Criado por': info.get('criado_por', 'N/A')
@@ -496,7 +645,7 @@ def main():
                         with col1:
                             filtro_local_geral = st.selectbox(
                                 "Filtrar por local",
-                                ["Todos"] + LOCAIS_ATUACAO,
+                                ["Todos"] + get_all_locais(),
                                 key="filtro_geral"
                             )
                         
