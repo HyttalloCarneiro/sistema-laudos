@@ -88,15 +88,12 @@ def format_date_iso(date_str):
     if isinstance(date_str, str) and len(date_str) == 10 and '-' in date_str:
         parts = date_str.split('-')
         if len(parts) == 3:
-            # Se já está no formato DD-MM-YYYY
             if len(parts[0]) == 2:
                 return f"{parts[2]}-{parts[1]}-{parts[0]}"
-            # Se está no formato YYYY-MM-DD
             else:
                 return date_str
     return date_str
 
-# Função para inicializar dados na sessão
 def init_session_data():
     """Inicializa dados na sessão do Streamlit"""
     if 'users' not in st.session_state:
@@ -105,7 +102,7 @@ def init_session_data():
                 "password": "admin123",
                 "role": "administrador",
                 "name": "Dr. Hyttallo",
-                "permissoes": {}  # Admin tem todas as permissões
+                "permissoes": {}
             }
         }
     
@@ -113,7 +110,7 @@ def init_session_data():
         st.session_state.pericias = {}
     
     if 'processos' not in st.session_state:
-        st.session_state.processos = {}  # {data_local: [lista_de_processos]}
+        st.session_state.processos = {}
     
     if 'locais_estaduais' not in st.session_state:
         st.session_state.locais_estaduais = []
@@ -161,7 +158,6 @@ def get_all_locais():
     """Retorna todos os locais (federais + estaduais) em ordem alfabética"""
     estaduais_ordenados = sorted(st.session_state.locais_estaduais)
     return LOCAIS_FEDERAIS + estaduais_ordenados
-
 def create_calendar_view(year, month):
     """Cria visualização do calendário em português"""
     cal = calendar.monthcalendar(year, month)
@@ -467,7 +463,6 @@ def show_processos_view(data_iso, local_name):
         
     else:
         st.info("📭 Nenhum processo cadastrado para esta data/local ainda.")
-
 def main():
     """Função principal do aplicativo"""
     
@@ -594,9 +589,26 @@ def main():
         
         # Verificar qual tela mostrar
         if st.session_state.selected_date_local:
-            # Tela de gerenciamento de processos
-            data_iso, local_name = st.session_state.selected_date_local.split('_', 1)
-            show_processos_view(data_iso, local_name)
+            # CORREÇÃO DO ERRO: Verificar se a string contém underscore antes de fazer split
+            try:
+                if '_' in st.session_state.selected_date_local:
+                    parts = st.session_state.selected_date_local.split('_')
+                    if len(parts) >= 2:
+                        data_iso = parts[0]
+                        local_name = '_'.join(parts[1:])  # Reconstroi o nome do local caso tenha underscores
+                        show_processos_view(data_iso, local_name)
+                    else:
+                        st.error("❌ Erro na identificação da data/local. Retornando ao calendário.")
+                        st.session_state.selected_date_local = None
+                        st.rerun()
+                else:
+                    st.error("❌ Formato inválido para data/local. Retornando ao calendário.")
+                    st.session_state.selected_date_local = None
+                    st.rerun()
+            except Exception as e:
+                st.error(f"❌ Erro ao processar data/local: {str(e)}")
+                st.session_state.selected_date_local = None
+                st.rerun()
         
         elif st.session_state.show_estaduais_management and user_info['role'] == 'administrador':
             # Gerenciamento de locais estaduais
@@ -929,7 +941,7 @@ def main():
                     
                     # Filtros (se permitido)
                     if has_permission(user_info, 'filtrar_pericias'):
-                        col1, col2 = st                         col1, col2 = st.columns(2)
+                        col1, col2 = st.columns(2)
                         with col1:
                             filtro_local_geral = st.selectbox(
                                 "Filtrar por local",
