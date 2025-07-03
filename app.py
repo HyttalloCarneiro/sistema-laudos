@@ -42,6 +42,20 @@ LOCAIS_ATUACAO = [
     "Estaduais (Diversas varas)"
 ]
 
+# Permissões padrão para assistentes
+PERMISSOES_ASSISTENTE = {
+    "visualizar_calendario": True,
+    "agendar_pericias": True,
+    "editar_pericias": False,
+    "deletar_pericias": False,
+    "visualizar_todas_pericias": True,
+    "filtrar_pericias": True,
+    "alterar_propria_senha": True,
+    "visualizar_locais": True,
+    "gerenciar_usuarios": False,
+    "acessar_configuracoes_avancadas": False
+}
+
 def format_date_br(date_str):
     """Converte data de YYYY-MM-DD para DD-MM-YYYY"""
     if isinstance(date_str, str) and len(date_str) == 10:
@@ -70,7 +84,8 @@ def init_session_data():
             "admin": {
                 "password": "admin123",
                 "role": "administrador",
-                "name": "Dr. Hyttallo"
+                "name": "Dr. Hyttallo",
+                "permissoes": {}  # Admin tem todas as permissões
             }
         }
     
@@ -85,6 +100,12 @@ def init_session_data():
     
     if 'selected_date' not in st.session_state:
         st.session_state.selected_date = None
+    
+    if 'show_user_management' not in st.session_state:
+        st.session_state.show_user_management = False
+    
+    if 'show_change_password' not in st.session_state:
+        st.session_state.show_change_password = False
 
 def authenticate_user(username, password):
     """Autentica usuário"""
@@ -92,6 +113,14 @@ def authenticate_user(username, password):
         if st.session_state.users[username]["password"] == password:
             return st.session_state.users[username]
     return None
+
+def has_permission(user_info, permission):
+    """Verifica se o usuário tem uma permissão específica"""
+    if user_info['role'] == 'administrador':
+        return True
+    
+    user_permissions = user_info.get('permissoes', PERMISSOES_ASSISTENTE)
+    return user_permissions.get(permission, False)
 
 def create_calendar_view(year, month):
     """Cria visualização do calendário em português"""
@@ -158,8 +187,6 @@ def main():
                     else:
                         st.error("❌ Usuário ou senha incorretos!")
         
-        # Removido: Informações do sistema com credenciais expostas
-        
     else:
         # Interface principal após login
         user_info = st.session_state.user_info
@@ -174,29 +201,31 @@ def main():
             if st.button("🚪 Sair", type="secondary"):
                 st.session_state.authenticated = False
                 st.session_state.user_info = None
+                st.session_state.show_user_management = False
+                st.session_state.show_change_password = False
                 st.rerun()
         
         st.markdown("---")
         
-        # Sidebar para administração e configurações
+        # Sidebar para configurações
         with st.sidebar:
             st.markdown("### ⚙️ Configurações")
             
             # Opção para mudar senha (disponível para todos)
-            if st.button("🔑 Mudar Senha"):
-                st.session_state.show_change_password = True
+            if has_permission(user_info, 'alterar_propria_senha'):
+                if st.button("🔑 Mudar Senha"):
+                    st.session_state.show_change_password = not st.session_state.show_change_password
             
+            # Administração (apenas admin)
             if user_info['role'] == 'administrador':
                 st.markdown("### 🛠️ Administração")
                 
+                # Toggle para gerenciamento de usuários
                 if st.button("👥 Gerenciar Usuários"):
-                    st.session_state.show_user_management = True
-                
-                if st.button("📊 Relatórios"):
-                    st.session_state.show_reports = True
+                    st.session_state.show_user_management = not st.session_state.show_user_management
         
-        # Formulário para mudar senha
-        if st.session_state.get('show_change_password', False):
+        # Formulário para mudar senha (aparece apenas quando ativado)
+        if st.session_state.show_change_password:
             st.markdown("### 🔑 Alterar Senha")
             
             with st.form("change_password"):
@@ -228,25 +257,69 @@ def main():
                     if st.form_submit_button("❌ Cancelar"):
                         st.session_state.show_change_password = False
                         st.rerun()
+            
+            st.markdown("---")
         
-        # Gerenciamento de usuários (apenas admin)
-        if user_info['role'] == 'administrador' and st.session_state.get('show_user_management', False):
+        # Gerenciamento de usuários (aparece apenas quando ativado pelo admin)
+        if user_info['role'] == 'administrador' and st.session_state.show_user_management:
             st.markdown("### 👥 Gerenciamento de Usuários")
             
+            # Criar novo usuário
             with st.expander("➕ Criar Novo Usuário"):
                 with st.form("create_user"):
-                    new_username = st.text_input("Nome de usuário")
-                    new_password = st.text_input("Senha", type="password")
-                    new_name = st.text_input("Nome completo")
-                    new_role = st.selectbox("Perfil", ["assistente", "administrador"])
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        new_username = st.text_input("Nome de usuário")
+                        new_password = st.text_input("Senha", type="password")
+                    with col2:
+                        new_name = st.text_input("Nome completo")
+                        new_role = st.selectbox("Perfil", ["assistente", "administrador"])
+                    
+                    # Configuração de permissões para assistentes
+                    if new_role == "assistente":
+                        st.markdown("#### 🔒 Configurar Permissões do Assistente")
+                        st.markdown("*Configure quais funcionalidades este assistente poderá acessar:*")
+                        
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            st.markdown("**📅 Calendário e Perícias**")
+                            perm_visualizar_calendario = st.checkbox("Visualizar calendário", value=True)
+                            perm_agendar_pericias = st.checkbox("Agendar perícias", value=True)
+                            perm_editar_pericias = st.checkbox("Editar perícias", value=False)
+                            perm_deletar_pericias = st.checkbox("Deletar perícias", value=False)
+                            
+                        with col2:
+                            st.markdown("**📊 Visualização e Filtros**")
+                            perm_visualizar_todas_pericias = st.checkbox("Ver todas as perícias", value=True)
+                            perm_filtrar_pericias = st.checkbox("Usar filtros", value=True)
+                            perm_visualizar_locais = st.checkbox("Ver locais de atuação", value=True)
+                            perm_alterar_propria_senha = st.checkbox("Alterar própria senha", value=True)
                     
                     if st.form_submit_button("Criar Usuário"):
                         if new_username not in st.session_state.users:
                             if len(new_password) >= 6:
+                                # Configurar permissões baseadas no perfil
+                                if new_role == "assistente":
+                                    permissoes = {
+                                        "visualizar_calendario": perm_visualizar_calendario,
+                                        "agendar_pericias": perm_agendar_pericias,
+                                        "editar_pericias": perm_editar_pericias,
+                                        "deletar_pericias": perm_deletar_pericias,
+                                        "visualizar_todas_pericias": perm_visualizar_todas_pericias,
+                                        "filtrar_pericias": perm_filtrar_pericias,
+                                        "alterar_propria_senha": perm_alterar_propria_senha,
+                                        "visualizar_locais": perm_visualizar_locais,
+                                        "gerenciar_usuarios": False,
+                                        "acessar_configuracoes_avancadas": False
+                                    }
+                                else:
+                                    permissoes = {}  # Admin tem todas as permissões
+                                
                                 st.session_state.users[new_username] = {
                                     "password": new_password,
                                     "role": new_role,
-                                    "name": new_name
+                                    "name": new_name,
+                                    "permissoes": permissoes
                                 }
                                 st.success(f"✅ Usuário {new_username} criado com sucesso!")
                             else:
@@ -255,186 +328,224 @@ def main():
                             st.error("❌ Usuário já existe!")
             
             # Lista de usuários existentes
-            st.markdown("#### Usuários Cadastrados")
+            st.markdown("#### 📋 Usuários Cadastrados")
             for username, info in st.session_state.users.items():
-                col1, col2, col3 = st.columns([2, 2, 1])
-                col1.write(f"**{info['name']}** ({username})")
-                col2.write(f"*{info['role'].title()}*")
-                if username != st.session_state.username:
-                    if col3.button("🗑️", key=f"del_{username}"):
-                        del st.session_state.users[username]
-                        st.rerun()
-        
-        # Interface principal
-        tab1, tab2 = st.tabs(["📅 Calendário e Perícias", "📋 Gerenciar Perícias"])
-        
-        with tab1:
-            # Calendário
-            col1, col2 = st.columns([2, 1])
-            
-            with col2:
-                st.markdown("### 🗓️ Navegação")
-                today = datetime.now()
-                selected_month = st.selectbox(
-                    "Mês",
-                    range(1, 13),
-                    index=today.month - 1,
-                    format_func=lambda x: MESES_PT[x]
-                )
-                selected_year = st.selectbox(
-                    "Ano",
-                    range(today.year - 1, today.year + 3),
-                    index=1
-                )
-            
-            with col1:
-                create_calendar_view(selected_year, selected_month)
-            
-            # Formulário para adicionar perícia na data selecionada
-            if st.session_state.selected_date:
-                st.markdown("---")
-                date_formatted = format_date_br(st.session_state.selected_date)
-                st.markdown(f"### 📝 Agendar Perícia - {date_formatted}")
-                
-                with st.form("add_pericia"):
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        local_pericia = st.selectbox("Local da Perícia", LOCAIS_ATUACAO)
-                    with col2:
-                        hora_pericia = st.time_input("Horário", value=datetime.strptime("09:00", "%H:%M").time())
+                with st.expander(f"👤 {info['name']} ({username}) - {info['role'].title()}"):
+                    col1, col2 = st.columns([3, 1])
                     
-                    observacoes = st.text_area("Observações (opcional)")
-                    
-                    col1, col2 = st.columns(2)
                     with col1:
-                        if st.form_submit_button("✅ Confirmar Perícia", type="primary"):
-                            st.session_state.pericias[st.session_state.selected_date] = {
-                                "local": local_pericia,
-                                "hora": hora_pericia.strftime("%H:%M"),
-                                "observacoes": observacoes,
-                                "criado_por": st.session_state.username,
-                                "criado_em": datetime.now().isoformat()
-                            }
-                            st.success("✅ Perícia agendada com sucesso!")
-                            st.session_state.selected_date = None
-                            st.rerun()
+                        st.write(f"**Nome:** {info['name']}")
+                        st.write(f"**Usuário:** {username}")
+                        st.write(f"**Perfil:** {info['role'].title()}")
+                        
+                        # Mostrar permissões para assistentes
+                        if info['role'] == 'assistente':
+                            st.markdown("**Permissões ativas:**")
+                            permissoes = info.get('permissoes', PERMISSOES_ASSISTENTE)
+                            permissoes_ativas = [k for k, v in permissoes.items() if v]
+                            if permissoes_ativas:
+                                for perm in permissoes_ativas:
+                                    st.write(f"• {perm.replace('_', ' ').title()}")
+                            else:
+                                st.write("• Nenhuma permissão ativa")
                     
                     with col2:
-                        if st.form_submit_button("❌ Cancelar"):
-                            st.session_state.selected_date = None
-                            st.rerun()
+                        if username != st.session_state.username:
+                            if st.button("🗑️ Remover", key=f"del_{username}", type="secondary"):
+                                del st.session_state.users[username]
+                                st.success(f"Usuário {username} removido!")
+                                st.rerun()
+                        else:
+                            st.info("Você não pode remover seu próprio usuário")
             
-            # Locais de atuação
             st.markdown("---")
-            st.markdown("### 🏛️ Locais de Atuação")
+        
+        # Interface principal - só mostra se não estiver em modo de gerenciamento
+        if not st.session_state.show_user_management:
+            tab1, tab2 = st.tabs(["📅 Calendário e Perícias", "📋 Gerenciar Perícias"])
             
-            cols = st.columns(3)
-            for i, local in enumerate(LOCAIS_ATUACAO):
-                with cols[i % 3]:
-                    if st.button(f"📍 {local}", key=f"local_{i}", use_container_width=True):
-                        st.session_state.filtro_local = local
-            
-            # Lista de perícias por local (se filtro ativo)
-            if st.session_state.get('filtro_local'):
-                st.markdown(f"### 📋 Perícias - {st.session_state.filtro_local}")
+            with tab1:
+                # Verificar permissão para visualizar calendário
+                if not has_permission(user_info, 'visualizar_calendario'):
+                    st.error("❌ Você não tem permissão para visualizar o calendário.")
+                    return
                 
-                pericias_filtradas = []
-                for data, info in st.session_state.pericias.items():
-                    if info['local'] == st.session_state.filtro_local:
-                        pericias_filtradas.append({
+                # Calendário
+                col1, col2 = st.columns([2, 1])
+                
+                with col2:
+                    st.markdown("### 🗓️ Navegação")
+                    today = datetime.now()
+                    selected_month = st.selectbox(
+                        "Mês",
+                        range(1, 13),
+                        index=today.month - 1,
+                        format_func=lambda x: MESES_PT[x]
+                    )
+                    selected_year = st.selectbox(
+                        "Ano",
+                        range(today.year - 1, today.year + 3),
+                        index=1
+                    )
+                
+                with col1:
+                    create_calendar_view(selected_year, selected_month)
+                
+                # Formulário para adicionar perícia na data selecionada
+                if st.session_state.selected_date and has_permission(user_info, 'agendar_pericias'):
+                    st.markdown("---")
+                    date_formatted = format_date_br(st.session_state.selected_date)
+                    st.markdown(f"### 📝 Agendar Perícia - {date_formatted}")
+                    
+                    with st.form("add_pericia"):
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            local_pericia = st.selectbox("Local da Perícia", LOCAIS_ATUACAO)
+                        with col2:
+                            hora_pericia = st.time_input("Horário", value=datetime.strptime("09:00", "%H:%M").time())
+                        
+                        observacoes = st.text_area("Observações (opcional)")
+                        
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            if st.form_submit_button("✅ Confirmar Perícia", type="primary"):
+                                st.session_state.pericias[st.session_state.selected_date] = {
+                                    "local": local_pericia,
+                                    "hora": hora_pericia.strftime("%H:%M"),
+                                    "observacoes": observacoes,
+                                    "criado_por": st.session_state.username,
+                                    "criado_em": datetime.now().isoformat()
+                                }
+                                st.success("✅ Perícia agendada com sucesso!")
+                                st.session_state.selected_date = None
+                                st.rerun()
+                        
+                        with col2:
+                            if st.form_submit_button("❌ Cancelar"):
+                                st.session_state.selected_date = None
+                                st.rerun()
+                
+                # Locais de atuação
+                if has_permission(user_info, 'visualizar_locais'):
+                    st.markdown("---")
+                    st.markdown("### 🏛️ Locais de Atuação")
+                    
+                    cols = st.columns(3)
+                    for i, local in enumerate(LOCAIS_ATUACAO):
+                        with cols[i % 3]:
+                            if st.button(f"📍 {local}", key=f"local_{i}", use_container_width=True):
+                                if has_permission(user_info, 'filtrar_pericias'):
+                                    st.session_state.filtro_local = local
+                
+                # Lista de perícias por local (se filtro ativo)
+                if st.session_state.get('filtro_local') and has_permission(user_info, 'filtrar_pericias'):
+                    st.markdown(f"### 📋 Perícias - {st.session_state.filtro_local}")
+                    
+                    pericias_filtradas = []
+                    for data, info in st.session_state.pericias.items():
+                        if info['local'] == st.session_state.filtro_local:
+                            pericias_filtradas.append({
+                                'Data': format_date_br(data),
+                                'Horário': info['hora'],
+                                'Local': info['local'],
+                                'Observações': info.get('observacoes', '')
+                            })
+                    
+                    if pericias_filtradas:
+                        df = pd.DataFrame(pericias_filtradas)
+                        # Ordenar por data
+                        df['Data_Sort'] = df['Data'].apply(format_date_iso)
+                        df = df.sort_values('Data_Sort').drop('Data_Sort', axis=1)
+                        st.dataframe(df, use_container_width=True)
+                    else:
+                        st.info("Nenhuma perícia agendada para este local.")
+                    
+                    if st.button("🔄 Limpar Filtro"):
+                        if 'filtro_local' in st.session_state:
+                            del st.session_state.filtro_local
+                        st.rerun()
+            
+            with tab2:
+                # Verificar permissão para visualizar todas as perícias
+                if not has_permission(user_info, 'visualizar_todas_pericias'):
+                    st.error("❌ Você não tem permissão para visualizar todas as perícias.")
+                    return
+                
+                st.markdown("### 📋 Gerenciar Todas as Perícias")
+                
+                if st.session_state.pericias:
+                    # Converter para DataFrame
+                    pericias_list = []
+                    for data, info in st.session_state.pericias.items():
+                        pericias_list.append({
                             'Data': format_date_br(data),
                             'Horário': info['hora'],
                             'Local': info['local'],
-                            'Observações': info.get('observacoes', '')
+                            'Observações': info.get('observacoes', ''),
+                            'Criado por': info.get('criado_por', 'N/A')
                         })
-                
-                if pericias_filtradas:
-                    df = pd.DataFrame(pericias_filtradas)
-                    # Ordenar por data (convertendo de volta para ISO para ordenação)
+                    
+                    df = pd.DataFrame(pericias_list)
+                    # Ordenar por data
                     df['Data_Sort'] = df['Data'].apply(format_date_iso)
-                    df = df.sort_values('Data_Sort').drop('Data_Sort', axis=1)
-                    st.dataframe(df, use_container_width=True)
-                else:
-                    st.info("Nenhuma perícia agendada para este local.")
-                
-                if st.button("🔄 Limpar Filtro"):
-                    if 'filtro_local' in st.session_state:
-                        del st.session_state.filtro_local
-                    st.rerun()
-        
-        with tab2:
-            st.markdown("### 📋 Gerenciar Todas as Perícias")
-            
-            if st.session_state.pericias:
-                # Converter para DataFrame
-                pericias_list = []
-                for data, info in st.session_state.pericias.items():
-                    pericias_list.append({
-                        'Data': format_date_br(data),
-                        'Horário': info['hora'],
-                        'Local': info['local'],
-                        'Observações': info.get('observacoes', ''),
-                        'Criado por': info.get('criado_por', 'N/A')
-                    })
-                
-                df = pd.DataFrame(pericias_list)
-                # Ordenar por data
-                df['Data_Sort'] = df['Data'].apply(format_date_iso)
-                df = df.sort_values('Data_Sort', ascending=False).drop('Data_Sort', axis=1)
-                
-                # Filtros
-                col1, col2 = st.columns(2)
-                with col1:
-                    filtro_local_geral = st.selectbox(
-                        "Filtrar por local",
-                        ["Todos"] + LOCAIS_ATUACAO,
-                        key="filtro_geral"
-                    )
-                
-                with col2:
-                    filtro_data = st.date_input("Filtrar a partir da data")
-                
-                # Aplicar filtros
-                df_filtrado = df.copy()
-                if filtro_local_geral != "Todos":
-                    df_filtrado = df_filtrado[df_filtrado['Local'] == filtro_local_geral]
-                
-                if filtro_data:
-                    filtro_data_str = filtro_data.strftime("%d-%m-%Y")
-                    df_filtrado['Data_Compare'] = df_filtrado['Data'].apply(format_date_iso)
-                    filtro_data_iso = format_date_iso(filtro_data_str)
-                    df_filtrado = df_filtrado[df_filtrado['Data_Compare'] >= filtro_data_iso]
-                    df_filtrado = df_filtrado.drop('Data_Compare', axis=1)
-                
-                st.dataframe(df_filtrado, use_container_width=True)
-                
-                # Opção para deletar perícias (apenas admin)
-                if user_info['role'] == 'administrador':
-                    st.markdown("#### 🗑️ Remover Perícia")
+                    df = df.sort_values('Data_Sort', ascending=False).drop('Data_Sort', axis=1)
                     
-                    # Criar lista de opções com datas formatadas
-                    opcoes_remover = [""]
-                    for data in st.session_state.pericias.keys():
-                        data_br = format_date_br(data)
-                        local = st.session_state.pericias[data]['local']
-                        opcoes_remover.append(f"{data_br} - {local}")
-                    
-                    data_remover_display = st.selectbox(
-                        "Selecione a perícia para remover",
-                        opcoes_remover
-                    )
-                    
-                    if data_remover_display and st.button("🗑️ Confirmar Remoção", type="secondary"):
-                        # Extrair a data original da opção selecionada
-                        data_br = data_remover_display.split(' - ')[0]
-                        data_iso = format_date_iso(data_br)
+                    # Filtros (se permitido)
+                    if has_permission(user_info, 'filtrar_pericias'):
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            filtro_local_geral = st.selectbox(
+                                "Filtrar por local",
+                                ["Todos"] + LOCAIS_ATUACAO,
+                                key="filtro_geral"
+                            )
                         
-                        if data_iso in st.session_state.pericias:
-                            del st.session_state.pericias[data_iso]
-                            st.success("✅ Perícia removida com sucesso!")
-                            st.rerun()
-            else:
-                st.info("📭 Nenhuma perícia agendada ainda.")
+                        with col2:
+                            filtro_data = st.date_input("Filtrar a partir da data")
+                        
+                        # Aplicar filtros
+                        df_filtrado = df.copy()
+                        if filtro_local_geral != "Todos":
+                            df_filtrado = df_filtrado[df_filtrado['Local'] == filtro_local_geral]
+                        
+                        if filtro_data:
+                            filtro_data_str = filtro_data.strftime("%d-%m-%Y")
+                            df_filtrado['Data_Compare'] = df_filtrado['Data'].apply(format_date_iso)
+                            filtro_data_iso = format_date_iso(filtro_data_str)
+                            df_filtrado = df_filtrado[df_filtrado['Data_Compare'] >= filtro_data_iso]
+                            df_filtrado = df_filtrado.drop('Data_Compare', axis=1)
+                        
+                        st.dataframe(df_filtrado, use_container_width=True)
+                    else:
+                        st.dataframe(df, use_container_width=True)
+                    
+                    # Opção para deletar perícias (apenas se permitido)
+                    if has_permission(user_info, 'deletar_pericias'):
+                        st.markdown("#### 🗑️ Remover Perícia")
+                        
+                        # Criar lista de opções com datas formatadas
+                        opcoes_remover = [""]
+                        for data in st.session_state.pericias.keys():
+                            data_br = format_date_br(data)
+                            local = st.session_state.pericias[data]['local']
+                            opcoes_remover.append(f"{data_br} - {local}")
+                        
+                        data_remover_display = st.selectbox(
+                            "Selecione a perícia para remover",
+                            opcoes_remover
+                        )
+                        
+                        if data_remover_display and st.button("🗑️ Confirmar Remoção", type="secondary"):
+                            # Extrair a data original da opção selecionada
+                            data_br = data_remover_display.split(' - ')[0]
+                            data_iso = format_date_iso(data_br)
+                            
+                            if data_iso in st.session_state.pericias:
+                                del st.session_state.pericias[data_iso]
+                                st.success("✅ Perícia removida com sucesso!")
+                                st.rerun()
+                else:
+                    st.info("📭 Nenhuma perícia agendada ainda.")
 
 if __name__ == "__main__":
     main()
