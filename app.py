@@ -929,4 +929,81 @@ def main():
                     
                     # Filtros (se permitido)
                     if has_permission(user_info, 'filtrar_pericias'):
-                        col1, col2 = st
+                        col1, col2 = st                         col1, col2 = st.columns(2)
+                        with col1:
+                            filtro_local_geral = st.selectbox(
+                                "Filtrar por local",
+                                ["Todos"] + get_all_locais(),
+                                key="filtro_geral"
+                            )
+                        
+                        with col2:
+                            filtro_data = st.date_input("Filtrar a partir da data")
+                        
+                        # Aplicar filtros
+                        df_filtrado = df.copy()
+                        if filtro_local_geral != "Todos":
+                            df_filtrado = df_filtrado[df_filtrado['Local'] == filtro_local_geral]
+                        
+                        if filtro_data:
+                            filtro_data_str = filtro_data.strftime("%d-%m-%Y")
+                            df_filtrado['Data_Compare'] = df_filtrado['Data'].apply(format_date_iso)
+                            filtro_data_iso = format_date_iso(filtro_data_str)
+                            df_filtrado = df_filtrado[df_filtrado['Data_Compare'] >= filtro_data_iso]
+                            df_filtrado = df_filtrado.drop('Data_Compare', axis=1)
+                        
+                        st.dataframe(df_filtrado, use_container_width=True)
+                    else:
+                        st.dataframe(df, use_container_width=True)
+                    
+                    # Opção para deletar perícias (apenas se permitido)
+                    if has_permission(user_info, 'deletar_pericias'):
+                        st.markdown("#### 🗑️ Remover Perícia")
+                        
+                        # Criar lista de opções com datas formatadas
+                        opcoes_remover = [""]
+                        for chave in st.session_state.pericias.keys():
+                            if '_' in chave:
+                                data = chave.split('_')[0]
+                            else:
+                                data = chave
+                            
+                            data_br = format_date_br(data)
+                            local = st.session_state.pericias[chave]['local']
+                            opcoes_remover.append(f"{data_br} - {local}")
+                        
+                        data_remover_display = st.selectbox(
+                            "Selecione a perícia para remover",
+                            opcoes_remover
+                        )
+                        
+                        if data_remover_display and st.button("🗑️ Confirmar Remoção", type="secondary"):
+                            # Extrair a data e local da opção selecionada
+                            data_br, local = data_remover_display.split(' - ', 1)
+                            data_iso = format_date_iso(data_br)
+                            
+                            # Encontrar a chave correta
+                            chave_para_remover = None
+                            for chave, info in st.session_state.pericias.items():
+                                if '_' in chave:
+                                    data_chave = chave.split('_')[0]
+                                else:
+                                    data_chave = chave
+                                
+                                if data_chave == data_iso and info['local'] == local:
+                                    chave_para_remover = chave
+                                    break
+                            
+                            if chave_para_remover:
+                                del st.session_state.pericias[chave_para_remover]
+                                # Também remover processos associados se existirem
+                                key_processos = f"{data_iso}_{local}"
+                                if key_processos in st.session_state.processos:
+                                    del st.session_state.processos[key_processos]
+                                st.success("✅ Perícia removida com sucesso!")
+                                st.rerun()
+                else:
+                    st.info("📭 Nenhuma perícia agendada ainda.")
+
+if __name__ == "__main__":
+    main()
