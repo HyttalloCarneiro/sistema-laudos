@@ -129,7 +129,8 @@ def formatar_cpf(cpf):
     if len(cpf) == 11:
         return f"{cpf[:3]}.{cpf[3:6]}.{cpf[6:9]}-{cpf[9:]}"
     return cpf
-    # Função para configurar cabeçalho do documento
+
+# Função para configurar cabeçalho do documento
 def configurar_cabecalho(doc):
     section = doc.sections[0]
     header = section.header
@@ -251,7 +252,127 @@ def adicionar_imagem_documento(doc, imagem_bytes, largura_inches=2.0, altura_inc
     except Exception as e:
         st.error(f"Erro ao adicionar imagem ao documento: {str(e)}")
         return False
-        def main():
+
+def gerar_laudo_completo():
+    """
+    Gera o documento completo do laudo pericial
+    """
+    try:
+        # Criar documento
+        doc = Document()
+        
+        # Configurar cabeçalho e rodapé
+        configurar_cabecalho(doc)
+        configurar_rodape(doc)
+        
+        # Título principal
+        adicionar_titulo(doc, "LAUDO PERICIAL MÉDICO", 16, True)
+        doc.add_paragraph()
+        
+        # 1. IDENTIFICAÇÃO DO PROCESSO
+        adicionar_secao(doc, "1. IDENTIFICAÇÃO DO PROCESSO", 
+                       f"Processo nº: {st.session_state.dados_processo.get('numero_processo', 'N/A')}\n"
+                       f"Vara: {st.session_state.dados_processo.get('vara', 'N/A')}\n"
+                       f"Comarca: {st.session_state.dados_processo.get('comarca', 'N/A')}\n"
+                       f"Juiz(a): {st.session_state.dados_processo.get('juiz', 'N/A')}\n"
+                       f"Tipo de Ação: {st.session_state.dados_processo.get('tipo_acao', 'N/A')}\n"
+                       f"Data da Nomeação: {st.session_state.dados_processo.get('data_nomeacao', 'N/A')}")
+        
+        # 2. IDENTIFICAÇÃO DO AUTOR
+        texto_identificacao = (f"Nome: {st.session_state.dados_autor.get('nome', 'N/A')}\n"
+                              f"CPF: {st.session_state.dados_autor.get('cpf', 'N/A')}\n"
+                              f"RG: {st.session_state.dados_autor.get('rg', 'N/A')}\n"
+                              f"Data de Nascimento: {st.session_state.dados_autor.get('data_nascimento', 'N/A')}\n"
+                              f"Estado Civil: {st.session_state.dados_autor.get('estado_civil', 'N/A')}\n"
+                              f"Profissão: {st.session_state.dados_autor.get('profissao', 'N/A')}\n"
+                              f"Endereço: {st.session_state.dados_autor.get('endereco', 'N/A')}\n"
+                              f"Telefone: {st.session_state.dados_autor.get('telefone', 'N/A')}")
+        
+        adicionar_secao(doc, "2. IDENTIFICAÇÃO DO AUTOR", texto_identificacao)
+        
+        # Adicionar foto do autor se disponível
+        if st.session_state.foto_autor:
+            try:
+                img_processada = processar_imagem(st.session_state.foto_autor)
+                if img_processada:
+                    adicionar_imagem_documento(doc, img_processada, 2.0, 2.7)
+            except Exception as e:
+                st.warning(f"Não foi possível adicionar a foto do autor: {str(e)}")
+        
+        # 3. HISTÓRICO
+        adicionar_secao(doc, "3. HISTÓRICO", 
+                       st.session_state.dados_pericia.get('historico_doenca', 'Não informado'))
+        
+        # 4. QUEIXA PRINCIPAL
+        adicionar_secao(doc, "4. QUEIXA PRINCIPAL", 
+                       st.session_state.dados_pericia.get('queixa_principal', 'Não informado'))
+        
+        # 5. EXAME FÍSICO
+        texto_exame = (f"Estado Geral: {st.session_state.dados_pericia.get('estado_geral', 'Não informado')}\n\n"
+                      f"Sinais Vitais: {st.session_state.dados_pericia.get('sinais_vitais', 'Não informado')}\n\n"
+                      f"Exame Físico Específico: {st.session_state.dados_pericia.get('exame_fisico_especifico', 'Não informado')}")
+        
+        adicionar_secao(doc, "5. EXAME FÍSICO", texto_exame)
+        
+        # 6. EXAMES COMPLEMENTARES
+        adicionar_secao(doc, "6. ANÁLISE DOS EXAMES COMPLEMENTARES", 
+                       st.session_state.dados_pericia.get('exames_complementares', 'Não foram apresentados exames complementares'))
+        
+        # 7. DISCUSSÃO
+        adicionar_secao(doc, "7. DISCUSSÃO", 
+                       st.session_state.dados_pericia.get('discussao', 'Não informado'))
+        
+        # 8. CONCLUSÃO
+        adicionar_secao(doc, "8. CONCLUSÃO", 
+                       st.session_state.dados_pericia.get('conclusao', 'Não informado'))
+        
+        # 9. CAPACIDADE LABORATIVA
+        texto_capacidade = (f"Capacidade Laborativa: {st.session_state.dados_pericia.get('capacidade_laborativa', 'Não avaliado')}\n"
+                           f"Grau de Incapacidade: {st.session_state.dados_pericia.get('grau_incapacidade', 'Não aplicável')}\n"
+                           f"Data de Início da Incapacidade: {st.session_state.dados_pericia.get('data_inicio_incapacidade', 'Não aplicável')}\n"
+                           f"Prognóstico: {st.session_state.dados_pericia.get('prognóstico', 'Não informado')}")
+        
+        adicionar_secao(doc, "9. CAPACIDADE LABORATIVA", texto_capacidade)
+        
+        # Data e assinatura
+        doc.add_paragraph()
+        data_atual = datetime.now().strftime("%d/%m/%Y")
+        adicionar_paragrafo(doc, f"Local e Data: {st.session_state.dados_pericia.get('local_pericia', 'N/A')}, {data_atual}")
+        
+        doc.add_paragraph()
+        doc.add_paragraph()
+        adicionar_paragrafo(doc, "_" * 50, WD_ALIGN_PARAGRAPH.CENTER)
+        adicionar_paragrafo(doc, "Dr. Hyttallo - Médico Perito", WD_ALIGN_PARAGRAPH.CENTER)
+        adicionar_paragrafo(doc, "CRM: [Número do CRM]", WD_ALIGN_PARAGRAPH.CENTER)
+        
+        # ANEXOS - Nova página
+        if st.session_state.fotos_documentos:
+            adicionar_quebra_pagina(doc)
+            adicionar_titulo(doc, "ANEXOS", 14, True)
+            doc.add_paragraph()
+            
+            for i, foto_bytes in enumerate(st.session_state.fotos_documentos):
+                try:
+                    img_processada = processar_imagem(foto_bytes, 6, 8)  # Tamanho maior para documentos
+                    if img_processada:
+                        adicionar_paragrafo(doc, f"Documento {i+1}:", WD_ALIGN_PARAGRAPH.LEFT, 12)
+                        adicionar_imagem_documento(doc, img_processada, 6.0, 8.0)
+                        doc.add_paragraph()
+                except Exception as e:
+                    st.warning(f"Não foi possível adicionar o documento {i+1}: {str(e)}")
+        
+        # Salvar documento em bytes
+        doc_bytes = io.BytesIO()
+        doc.save(doc_bytes)
+        doc_bytes.seek(0)
+        
+        return doc_bytes.getvalue()
+    
+    except Exception as e:
+        st.error(f"Erro ao gerar documento: {str(e)}")
+        return None
+
+def main():
     create_header()
     
     # Sidebar para navegação
@@ -382,7 +503,8 @@ def adicionar_imagem_documento(doc, imagem_bytes, largura_inches=2.0, altura_inc
                     st.session_state.dados_autor.get('estado_civil', '')
                 ) if st.session_state.dados_autor.get('estado_civil', '') in ["", "Solteiro(a)", "Casado(a)", "Divorciado(a)", "Viúvo(a)", "União Estável"] else 0
             )
-                # Seção: Dados da Perícia
+
+    # Seção: Dados da Perícia
     elif opcao == "Dados da Perícia":
         st.markdown('<div class="section-header"><h2>🔍 Dados da Perícia</h2></div>', unsafe_allow_html=True)
         
@@ -520,7 +642,8 @@ def adicionar_imagem_documento(doc, imagem_bytes, largura_inches=2.0, altura_inc
                     st.session_state.dados_pericia.get('prognóstico', '')
                 ) if st.session_state.dados_pericia.get('prognóstico', '') in ["", "Bom", "Regular", "Reservado", "Ruim"] else 0
             )
-                # Seção: Anexos
+
+    # Seção: Anexos
     elif opcao == "Anexos":
         st.markdown('<div class="section-header"><h2>📎 Anexos</h2></div>', unsafe_allow_html=True)
         
@@ -689,124 +812,6 @@ def adicionar_imagem_documento(doc, imagem_bytes, largura_inches=2.0, altura_inc
                     
                     except Exception as e:
                         st.error(f"❌ Erro ao gerar o laudo: {str(e)}")
-                        def gerar_laudo_completo():
-    """
-    Gera o documento completo do laudo pericial
-    """
-    try:
-        # Criar documento
-        doc = Document()
-        
-        # Configurar cabeçalho e rodapé
-        configurar_cabecalho(doc)
-        configurar_rodape(doc)
-        
-        # Título principal
-        adicionar_titulo(doc, "LAUDO PERICIAL MÉDICO", 16, True)
-        doc.add_paragraph()
-        
-        # 1. IDENTIFICAÇÃO DO PROCESSO
-        adicionar_secao(doc, "1. IDENTIFICAÇÃO DO PROCESSO", 
-                       f"Processo nº: {st.session_state.dados_processo.get('numero_processo', 'N/A')}\n"
-                       f"Vara: {st.session_state.dados_processo.get('vara', 'N/A')}\n"
-                       f"Comarca: {st.session_state.dados_processo.get('comarca', 'N/A')}\n"
-                       f"Juiz(a): {st.session_state.dados_processo.get('juiz', 'N/A')}\n"
-                       f"Tipo de Ação: {st.session_state.dados_processo.get('tipo_acao', 'N/A')}\n"
-                       f"Data da Nomeação: {st.session_state.dados_processo.get('data_nomeacao', 'N/A')}")
-        
-        # 2. IDENTIFICAÇÃO DO AUTOR
-        texto_identificacao = (f"Nome: {st.session_state.dados_autor.get('nome', 'N/A')}\n"
-                              f"CPF: {st.session_state.dados_autor.get('cpf', 'N/A')}\n"
-                              f"RG: {st.session_state.dados_autor.get('rg', 'N/A')}\n"
-                              f"Data de Nascimento: {st.session_state.dados_autor.get('data_nascimento', 'N/A')}\n"
-                              f"Estado Civil: {st.session_state.dados_autor.get('estado_civil', 'N/A')}\n"
-                              f"Profissão: {st.session_state.dados_autor.get('profissao', 'N/A')}\n"
-                              f"Endereço: {st.session_state.dados_autor.get('endereco', 'N/A')}\n"
-                              f"Telefone: {st.session_state.dados_autor.get('telefone', 'N/A')}")
-        
-        adicionar_secao(doc, "2. IDENTIFICAÇÃO DO AUTOR", texto_identificacao)
-        
-        # Adicionar foto do autor se disponível
-        if st.session_state.foto_autor:
-            try:
-                img_processada = processar_imagem(st.session_state.foto_autor)
-                if img_processada:
-                    adicionar_imagem_documento(doc, img_processada, 2.0, 2.7)
-            except Exception as e:
-                st.warning(f"Não foi possível adicionar a foto do autor: {str(e)}")
-        
-        # 3. HISTÓRICO
-        adicionar_secao(doc, "3. HISTÓRICO", 
-                       st.session_state.dados_pericia.get('historico_doenca', 'Não informado'))
-        
-        # 4. QUEIXA PRINCIPAL
-        adicionar_secao(doc, "4. QUEIXA PRINCIPAL", 
-                       st.session_state.dados_pericia.get('queixa_principal', 'Não informado'))
-        
-        # 5. EXAME FÍSICO
-        texto_exame = (f"Estado Geral: {st.session_state.dados_pericia.get('estado_geral', 'Não informado')}\n\n"
-                      f"Sinais Vitais: {st.session_state.dados_pericia.get('sinais_vitais', 'Não informado')}\n\n"
-                      f"Exame Físico Específico: {st.session_state.dados_pericia.get('exame_fisico_especifico', 'Não informado')}")
-        
-        adicionar_secao(doc, "5. EXAME FÍSICO", texto_exame)
-        
-        # 6. EXAMES COMPLEMENTARES
-        adicionar_secao(doc, "6. ANÁLISE DOS EXAMES COMPLEMENTARES", 
-                       st.session_state.dados_pericia.get('exames_complementares', 'Não foram apresentados exames complementares'))
-        
-        # 7. DISCUSSÃO
-        adicionar_secao(doc, "7. DISCUSSÃO", 
-                       st.session_state.dados_pericia.get('discussao', 'Não informado'))
-        
-        # 8. CONCLUSÃO
-        adicionar_secao(doc, "8. CONCLUSÃO", 
-                       st.session_state.dados_pericia.get('conclusao', 'Não informado'))
-        
-        # 9. CAPACIDADE LABORATIVA
-        texto_capacidade = (f"Capacidade Laborativa: {st.session_state.dados_pericia.get('capacidade_laborativa', 'Não avaliado')}\n"
-                           f"Grau de Incapacidade: {st.session_state.dados_pericia.get('grau_incapacidade', 'Não aplicável')}\n"
-                           f"Data de Início da Incapacidade: {st.session_state.dados_pericia.get('data_inicio_incapacidade', 'Não aplicável')}\n"
-                           f"Prognóstico: {st.session_state.dados_pericia.get('prognóstico', 'Não informado')}")
-        
-        adicionar_secao(doc, "9. CAPACIDADE LABORATIVA", texto_capacidade)
-        
-        # Data e assinatura
-        doc.add_paragraph()
-        data_atual = datetime.now().strftime("%d/%m/%Y")
-        adicionar_paragrafo(doc, f"Local e Data: {st.session_state.dados_pericia.get('local_pericia', 'N/A')}, {data_atual}")
-        
-        doc.add_paragraph()
-        doc.add_paragraph()
-        adicionar_paragrafo(doc, "_" * 50, WD_ALIGN_PARAGRAPH.CENTER)
-        adicionar_paragrafo(doc, "Dr. Hyttallo - Médico Perito", WD_ALIGN_PARAGRAPH.CENTER)
-        adicionar_paragrafo(doc, "CRM: [Número do CRM]", WD_ALIGN_PARAGRAPH.CENTER)
-        
-        # ANEXOS - Nova página
-        if st.session_state.fotos_documentos:
-            adicionar_quebra_pagina(doc)
-            adicionar_titulo(doc, "ANEXOS", 14, True)
-            doc.add_paragraph()
-            
-            for i, foto_bytes in enumerate(st.session_state.fotos_documentos):
-                try:
-                    img_processada = processar_imagem(foto_bytes, 6, 8)  # Tamanho maior para documentos
-                    if img_processada:
-                        adicionar_paragrafo(doc, f"Documento {i+1}:", WD_ALIGN_PARAGRAPH.LEFT, 12)
-                        adicionar_imagem_documento(doc, img_processada, 6.0, 8.0)
-                        doc.add_paragraph()
-                except Exception as e:
-                    st.warning(f"Não foi possível adicionar o documento {i+1}: {str(e)}")
-        
-        # Salvar documento em bytes
-        doc_bytes = io.BytesIO()
-        doc.save(doc_bytes)
-        doc_bytes.seek(0)
-        
-        return doc_bytes.getvalue()
-    
-    except Exception as e:
-        st.error(f"Erro ao gerar documento: {str(e)}")
-        return None
 
 # Executar aplicação
 if __name__ == "__main__":
