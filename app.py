@@ -100,60 +100,55 @@ def extract_process_data(text):
     if not text:
         return None
     
-    # Padrões de regex para extrair informações
-    patterns = {
-        'numero_processo': [
-            r'(?:Processo|PROCESSO|Nº|N°|Número)[\s\.:]*(\d{7}-\d{2}\.\d{4}\.\d\.\d{2}\.\d{4})',
-            r'(\d{7}-\d{2}\.\d{4}\.\d\.\d{2}\.\d{4})',
-            r'(?:Autos|AUTOS)[\s\.:]*(\d{7}-\d{2}\.\d{4}\.\d\.\d{2}\.\d{4})',
-            r'(\d{4}\.\d{2}\.\d{2}\.\d{6}-\d)',
-            r'(\d{4}\.\d{2}\.\d{2}\.\d{4}-\d{2})'
-        ],
-        'nome_parte': [
-            r'(?:Autor|AUTOR|Requerente|REQUERENTE|Parte|PARTE)[\s\.:]*([A-ZÁÀÂÃÉÈÊÍÌÎÓÒÔÕÚÙÛÇ][a-záàâãéèêíìîóòôõúùûç\s]+)',
-            r'(?:Nome|NOME)[\s\.:]*([A-ZÁÀÂÃÉÈÊÍÌÎÓÒÔÕÚÙÛÇ][a-záàâãéèêíìîóòôõúùûç\s]+)',
-            r'(?:Periciando|PERICIANDO)[\s\.:]*([A-ZÁÀÂÃÉÈÊÍÌÎÓÒÔÕÚÙÛÇ][a-záàâãéèêíìîóòôõúùûç\s]+)'
-        ]
-    }
-    
     extracted_data = {}
     
-    # Extrair número do processo
-    for pattern in patterns['numero_processo']:
-        match = re.search(pattern, text, re.IGNORECASE)
+    # Buscar numero do processo
+    numero_patterns = [
+        r'(\d{7}-\d{2}\.\d{4}\.\d\.\d{2}\.\d{4})',
+        r'(\d{4}\.\d{2}\.\d{2}\.\d{6}-\d)',
+        r'(\d{4}\.\d{2}\.\d{2}\.\d{4}-\d{2})'
+    ]
+    
+    for pattern in numero_patterns:
+        match = re.search(pattern, text)
         if match:
             extracted_data['numero_processo'] = match.group(1)
             break
     
-    # Extrair nome da parte
-    for pattern in patterns['nome_parte']:
+    # Buscar nome do autor
+    nome_patterns = [
+        r'(?:Autor|AUTOR)[\s\.:]*([A-Z][A-Za-z\s]+?)(?:\s*(?:CPF|RG|,|\n))',
+        r'(?:Requerente|REQUERENTE)[\s\.:]*([A-Z][A-Za-z\s]+?)(?:\s*(?:CPF|RG|,|\n))',
+        r'(?:Periciando|PERICIANDO)[\s\.:]*([A-Z][A-Za-z\s]+?)(?:\s*(?:CPF|RG|,|\n))'
+    ]
+    
+    for pattern in nome_patterns:
         match = re.search(pattern, text, re.IGNORECASE)
         if match:
             nome = match.group(1).strip()
-            # Limpar o nome (remover quebras de linha e espaços extras)
             nome = re.sub(r'\s+', ' ', nome)
-            # Limitar o tamanho do nome
-            if len(nome) > 50:
-                nome = nome[:50] + "..."
-            extracted_data['nome_parte'] = nome
-            break
+            if len(nome.split()) >= 2 and len(nome) >= 6:
+                if len(nome) > 50:
+                    nome = nome[:50] + "..."
+                extracted_data['nome_parte'] = nome
+                break
     
-    # Tentar determinar o tipo de perícia baseado no conteúdo
-    tipo_pericia = "Auxílio Doença (AD)"  # Padrão
+    # Determinar tipo de perícia
+    tipo_pericia = "Auxílio Doença (AD)"
     
-    if re.search(r'auxílio.?acidente|acidente.?trabalho', text, re.IGNORECASE):
-        tipo_pericia = "Auxílio Acidente (AA)"
-    elif re.search(r'bpc|benefício.?prestação.?continuada|loas', text, re.IGNORECASE):
+    if re.search(r'benefício\s+de\s+prestação\s+continuada|BPC|LOAS', text, re.IGNORECASE):
         tipo_pericia = "Benefício de Prestação Continuada (BPC)"
-    elif re.search(r'dpvat|seguro.?obrigatório', text, re.IGNORECASE):
+    elif re.search(r'auxílio[\s-]?acidente|acidente\s+do\s+trabalho', text, re.IGNORECASE):
+        tipo_pericia = "Auxílio Acidente (AA)"
+    elif re.search(r'seguro\s+DPVAT|DPVAT', text, re.IGNORECASE):
         tipo_pericia = "Seguro DPVAT (DPVAT)"
-    elif re.search(r'medicação|medicamento|fornecimento', text, re.IGNORECASE):
+    elif re.search(r'fornecimento\s+de\s+medicação|medicamento', text, re.IGNORECASE):
         tipo_pericia = "Fornecimento de medicação (MED)"
-    elif re.search(r'imposto.?renda|ir|dedução', text, re.IGNORECASE):
+    elif re.search(r'imposto\s+de\s+renda|IR', text, re.IGNORECASE):
         tipo_pericia = "Imposto de renda (IR)"
-    elif re.search(r'interdição|curatela|incapacidade', text, re.IGNORECASE):
+    elif re.search(r'interdição|curatela', text, re.IGNORECASE):
         tipo_pericia = "Interdição (INT)"
-    elif re.search(r'erro.?médico|responsabilidade.?médica|dano.?médico', text, re.IGNORECASE):
+    elif re.search(r'erro\s+médico|responsabilidade\s+médica', text, re.IGNORECASE):
         tipo_pericia = "Erro médico (ERRO)"
     
     extracted_data['tipo_pericia'] = tipo_pericia
@@ -550,104 +545,127 @@ def show_processos_view(data_iso, local_name):
         # Ordenar por horário
         processos_ordenados = sorted(processos_lista, key=lambda x: x['horario'])
         
-        # Criar DataFrame para exibição
-        df_processos = []
-        for i, processo in enumerate(processos_ordenados):
-            origem_icon = "📄" if processo.get('origem') == 'upload_pdf' else "✏️"
-            df_processos.append({
-                'Origem': origem_icon,
-                'Horário': processo['horario'],
-                'Número do Processo': processo['numero_processo'],
-                'Nome da Parte': processo['nome_parte'],
-                'Tipo': processo['tipo'],
-                'Situação': processo['situacao']
-            })
+        # Tabela personalizada
+        st.markdown("#### 📋 Lista de Processos")
         
-        df = pd.DataFrame(df_processos)
-        st.dataframe(df, use_container_width=True)
+        # Cabeçalho da tabela
+        col1, col2, col3, col4, col5, col6 = st.columns([1, 2, 3, 1, 1, 1])
+        with col1:
+            st.markdown("**Hora**")
+        with col2:
+            st.markdown("**Número do Processo**")
+        with col3:
+            st.markdown("**Nome do Autor**")
+        with col4:
+            st.markdown("**Benefício**")
+        with col5:
+            st.markdown("**Situação**")
+        with col6:
+            st.markdown("**Ação**")
+        
+        st.markdown("---")
+        
+        # Linhas da tabela
+        for i, processo in enumerate(processos_ordenados):
+            col1, col2, col3, col4, col5, col6 = st.columns([1, 2, 3, 1, 1, 1])
+            
+            with col1:
+                origem_icon = "📄" if processo.get('origem') == 'upload_pdf' else "✏️"
+                st.write(f"{origem_icon} {processo['horario']}")
+            
+            with col2:
+                st.write(processo['numero_processo'])
+            
+            with col3:
+                st.write(processo['nome_parte'])
+            
+            with col4:
+                # Extrair apenas a abreviação do tipo
+                tipo_abrev = processo['tipo'].split('(')[1].replace(')', '') if '(' in processo['tipo'] else processo['tipo']
+                st.write(tipo_abrev)
+            
+            with col5:
+                # Cor baseada na situação
+                if processo['situacao'] == 'Concluído':
+                    st.success(processo['situacao'])
+                elif processo['situacao'] == 'Em produção':
+                    st.warning(processo['situacao'])
+                else:
+                    st.info(processo['situacao'])
+            
+            with col6:
+                # Botões de ação
+                col_a, col_b = st.columns(2)
+                with col_a:
+                    if st.button("📝", key=f"laudo_{i}_{processo['numero_processo']}", help="Redigir Laudo"):
+                        st.session_state.processo_selecionado_laudo = processo
+                        st.session_state.show_redigir_laudo = True
+                        st.rerun()
+                
+                with col_b:
+                    if st.button("🗑️", key=f"delete_{i}_{processo['numero_processo']}", help="Excluir"):
+                        st.session_state.processo_para_excluir = processo
+                        st.session_state.show_confirm_delete = True
+                        st.rerun()
+            
+            st.markdown("---")
         
         # Legenda para os ícones
         st.markdown("**Legenda:** 📄 = Extraído de PDF | ✏️ = Inserido manualmente")
         
-        # Opções de edição/exclusão
-        if has_permission(st.session_state.user_info, 'editar_pericias'):
-            st.markdown("### ✏️ Editar/Excluir Processo")
-            
-            # Seletor de processo para editar
-            opcoes_processos = [f"{p['horario']} - {p['numero_processo']} - {p['nome_parte']}" for p in processos_ordenados]
-            
-            if opcoes_processos:
-                processo_selecionado = st.selectbox("Selecione o processo:", [""] + opcoes_processos)
+        # Modal de confirmação de exclusão
+        if st.session_state.get('show_confirm_delete', False):
+            processo_excluir = st.session_state.get('processo_para_excluir')
+            if processo_excluir:
+                st.error("⚠️ **CONFIRMAÇÃO DE EXCLUSÃO**")
+                st.write(f"**Processo:** {processo_excluir['numero_processo']}")
+                st.write(f"**Autor:** {processo_excluir['nome_parte']}")
+                st.write(f"**Tipo:** {processo_excluir['tipo']}")
                 
-                if processo_selecionado:
-                    # Encontrar índice do processo
-                    indice_processo = opcoes_processos.index(processo_selecionado)
-                    processo_atual = processos_ordenados[indice_processo]
-                    
-                    # Mostrar informações sobre a origem do processo
-                    if processo_atual.get('origem') == 'upload_pdf':
-                        st.info(f"📄 Este processo foi extraído do arquivo: {processo_atual.get('arquivo_original', 'N/A')}")
-                    
-                    # Formulário de edição
-                    with st.form("edit_processo"):
-                        st.markdown("#### Editar Processo")
-                        
-                        col1, col2 = st.columns(2)
-                        
-                        with col1:
-                            novo_numero = st.text_input("Número do Processo", value=processo_atual['numero_processo'])
-                            novo_nome = st.text_input("Nome da Parte", value=processo_atual['nome_parte'])
-                            novo_horario = st.time_input("Horário", value=datetime.strptime(processo_atual['horario'], "%H:%M").time())
-                        
-                        with col2:
-                            novo_tipo = st.selectbox("Tipo", TIPOS_PERICIA, index=TIPOS_PERICIA.index(processo_atual['tipo']))
-                            nova_situacao = st.selectbox("Situação", SITUACOES_PROCESSO, index=SITUACOES_PROCESSO.index(processo_atual['situacao']))
-                        
-                        col1, col2 = st.columns(2)
-                        
-                        with col1:
-                            if st.form_submit_button("✅ Salvar Alterações", type="primary"):
-                                # Encontrar o processo original na lista
-                                for i, p in enumerate(st.session_state.processos[key_processos]):
-                                    if (p['numero_processo'] == processo_atual['numero_processo'] and 
-                                        p['nome_parte'] == processo_atual['nome_parte'] and
-                                        p['horario'] == processo_atual['horario']):
-                                        
-                                        # Manter informações de origem
-                                        processo_atualizado = {
-                                            "numero_processo": novo_numero,
-                                            "nome_parte": novo_nome,
-                                            "horario": novo_horario.strftime("%H:%M"),
-                                            "tipo": novo_tipo,
-                                            "situacao": nova_situacao,
-                                            "criado_por": processo_atual['criado_por'],
-                                            "criado_em": processo_atual['criado_em'],
-                                            "editado_por": st.session_state.username,
-                                            "editado_em": datetime.now().isoformat(),
-                                            "origem": processo_atual.get('origem', 'manual')
-                                        }
-                                        
-                                        # Manter arquivo original se existir
-                                        if 'arquivo_original' in processo_atual:
-                                            processo_atualizado['arquivo_original'] = processo_atual['arquivo_original']
-                                        
-                                        st.session_state.processos[key_processos][i] = processo_atualizado
-                                        break
-                                
-                                st.success("✅ Processo atualizado com sucesso!")
-                                st.rerun()
-                        
-                        with col2:
-                            if st.form_submit_button("🗑️ Excluir Processo", type="secondary"):
-                                # Remover processo da lista
-                                st.session_state.processos[key_processos] = [
-                                    p for p in st.session_state.processos[key_processos]
-                                    if not (p['numero_processo'] == processo_atual['numero_processo'] and 
-                                           p['nome_parte'] == processo_atual['nome_parte'] and
-                                           p['horario'] == processo_atual['horario'])
-                                ]
-                                st.success("✅ Processo excluído com sucesso!")
-                                st.rerun()
+                col1, col2, col3 = st.columns(3)
+                
+                with col1:
+                    if st.button("❌ Cancelar", key="cancel_delete", type="secondary"):
+                        st.session_state.show_confirm_delete = False
+                        st.session_state.processo_para_excluir = None
+                        st.rerun()
+                
+                with col2:
+                    st.write("")  # Espaço
+                
+                with col3:
+                    if st.button("🗑️ CONFIRMAR EXCLUSÃO", key="confirm_delete", type="primary"):
+                        # Remover processo da lista
+                        st.session_state.processos[key_processos] = [
+                            p for p in st.session_state.processos[key_processos]
+                            if not (p['numero_processo'] == processo_excluir['numero_processo'] and 
+                                   p['nome_parte'] == processo_excluir['nome_parte'] and
+                                   p['horario'] == processo_excluir['horario'])
+                        ]
+                        st.session_state.show_confirm_delete = False
+                        st.session_state.processo_para_excluir = None
+                        st.success("✅ Processo excluído com sucesso!")
+                        st.rerun()
+                
+                st.markdown("---")
+        
+        # Placeholder para redação de laudo
+        if st.session_state.get('show_redigir_laudo', False):
+            processo_laudo = st.session_state.get('processo_selecionado_laudo')
+            if processo_laudo:
+                st.success("🎯 **MÓDULO DE REDAÇÃO DE LAUDO**")
+                st.write(f"**Processo:** {processo_laudo['numero_processo']}")
+                st.write(f"**Autor:** {processo_laudo['nome_parte']}")
+                st.write(f"**Tipo:** {processo_laudo['tipo']}")
+                
+                st.info("📝 **Em desenvolvimento** - Aqui será implementada a funcionalidade de redação automática de laudos pela IA.")
+                
+                if st.button("← Voltar para Lista de Processos"):
+                    st.session_state.show_redigir_laudo = False
+                    st.session_state.processo_selecionado_laudo = None
+                    st.rerun()
+                
+                st.markdown("---")
         
         # Estatísticas dos processos
         st.markdown("### 📊 Estatísticas dos Processos")
