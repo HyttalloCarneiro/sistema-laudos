@@ -920,7 +920,7 @@ def main():
                             perm_agendar_pericias = st.checkbox("Agendar perícias", value=True)
                             perm_editar_pericias = st.checkbox("Editar perícias", value=False)
                             perm_deletar_pericias = st.checkbox("Deletar perícias", value=False)
-                                                        perm_gerenciar_processos = st.checkbox("Gerenciar processos", value=True)
+                            perm_gerenciar_processos = st.checkbox("Gerenciar processos", value=True)
                             perm_upload_processos = st.checkbox("Upload de processos PDF", value=True)
                             
                         with col2:
