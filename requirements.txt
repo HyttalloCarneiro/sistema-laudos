@@ -1,4 +1,4 @@
 streamlit
+PyPDF2
 pandas
-python-docx
-pillow
+numpy
