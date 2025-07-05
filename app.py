@@ -4,6 +4,9 @@ import calendar
 from datetime import datetime, date
 import json
 import locale
+import PyPDF2
+import re
+import io
 
 # Configuração da página
 st.set_page_config(
@@ -73,8 +76,89 @@ PERMISSOES_ASSISTENTE = {
     "gerenciar_usuarios": False,
     "acessar_configuracoes_avancadas": False,
     "gerenciar_locais_estaduais": False,
-    "gerenciar_processos": True
+    "gerenciar_processos": True,
+    "upload_processos": True
 }
+
+def extract_text_from_pdf(pdf_file):
+    """Extrai texto de um arquivo PDF"""
+    try:
+        pdf_reader = PyPDF2.PdfReader(pdf_file)
+        text = ""
+        
+        # Extrair texto de todas as páginas
+        for page in pdf_reader.pages:
+            text += page.extract_text() + "\n"
+        
+        return text
+    except Exception as e:
+        st.error(f"❌ Erro ao extrair texto do PDF: {str(e)}")
+        return None
+
+def extract_process_data(text):
+    """Extrai dados do processo a partir do texto do PDF"""
+    if not text:
+        return None
+    
+    # Padrões de regex para extrair informações
+    patterns = {
+        'numero_processo': [
+            r'(?:Processo|PROCESSO|Nº|N°|Número)[\s\.:]*(\d{7}-\d{2}\.\d{4}\.\d\.\d{2}\.\d{4})',
+            r'(\d{7}-\d{2}\.\d{4}\.\d\.\d{2}\.\d{4})',
+            r'(?:Autos|AUTOS)[\s\.:]*(\d{7}-\d{2}\.\d{4}\.\d\.\d{2}\.\d{4})',
+            r'(\d{4}\.\d{2}\.\d{2}\.\d{6}-\d)',
+            r'(\d{4}\.\d{2}\.\d{2}\.\d{4}-\d{2})'
+        ],
+        'nome_parte': [
+            r'(?:Autor|AUTOR|Requerente|REQUERENTE|Parte|PARTE)[\s\.:]*([A-ZÁÀÂÃÉÈÊÍÌÎÓÒÔÕÚÙÛÇ][a-záàâãéèêíìîóòôõúùûç\s]+)',
+            r'(?:Nome|NOME)[\s\.:]*([A-ZÁÀÂÃÉÈÊÍÌÎÓÒÔÕÚÙÛÇ][a-záàâãéèêíìîóòôõúùûç\s]+)',
+            r'(?:Periciando|PERICIANDO)[\s\.:]*([A-ZÁÀÂÃÉÈÊÍÌÎÓÒÔÕÚÙÛÇ][a-záàâãéèêíìîóòôõúùûç\s]+)'
+        ]
+    }
+    
+    extracted_data = {}
+    
+    # Extrair número do processo
+    for pattern in patterns['numero_processo']:
+        match = re.search(pattern, text, re.IGNORECASE)
+        if match:
+            extracted_data['numero_processo'] = match.group(1)
+            break
+    
+    # Extrair nome da parte
+    for pattern in patterns['nome_parte']:
+        match = re.search(pattern, text, re.IGNORECASE)
+        if match:
+            nome = match.group(1).strip()
+            # Limpar o nome (remover quebras de linha e espaços extras)
+            nome = re.sub(r'\s+', ' ', nome)
+            # Limitar o tamanho do nome
+            if len(nome) > 50:
+                nome = nome[:50] + "..."
+            extracted_data['nome_parte'] = nome
+            break
+    
+    # Tentar determinar o tipo de perícia baseado no conteúdo
+    tipo_pericia = "Auxílio Doença (AD)"  # Padrão
+    
+    if re.search(r'auxílio.?acidente|acidente.?trabalho', text, re.IGNORECASE):
+        tipo_pericia = "Auxílio Acidente (AA)"
+    elif re.search(r'bpc|benefício.?prestação.?continuada|loas', text, re.IGNORECASE):
+        tipo_pericia = "Benefício de Prestação Continuada (BPC)"
+    elif re.search(r'dpvat|seguro.?obrigatório', text, re.IGNORECASE):
+        tipo_pericia = "Seguro DPVAT (DPVAT)"
+    elif re.search(r'medicação|medicamento|fornecimento', text, re.IGNORECASE):
+        tipo_pericia = "Fornecimento de medicação (MED)"
+    elif re.search(r'imposto.?renda|ir|dedução', text, re.IGNORECASE):
+        tipo_pericia = "Imposto de renda (IR)"
+    elif re.search(r'interdição|curatela|incapacidade', text, re.IGNORECASE):
+        tipo_pericia = "Interdição (INT)"
+    elif re.search(r'erro.?médico|responsabilidade.?médica|dano.?médico', text, re.IGNORECASE):
+        tipo_pericia = "Erro médico (ERRO)"
+    
+    extracted_data['tipo_pericia'] = tipo_pericia
+    
+    return extracted_data
 
 def format_date_br(date_str):
     """Converte data de YYYY-MM-DD para DD-MM-YYYY"""
@@ -158,6 +242,7 @@ def get_all_locais():
     """Retorna todos os locais (federais + estaduais) em ordem alfabética"""
     estaduais_ordenados = sorted(st.session_state.locais_estaduais)
     return LOCAIS_FEDERAIS + estaduais_ordenados
+
 def create_calendar_view(year, month):
     """Cria visualização do calendário em português"""
     cal = calendar.monthcalendar(year, month)
@@ -323,9 +408,109 @@ def show_processos_view(data_iso, local_name):
     if key_processos not in st.session_state.processos:
         st.session_state.processos[key_processos] = []
     
-    # Formulário para adicionar novo processo
-    with st.expander("➕ Adicionar Novo Processo"):
-        with st.form("add_processo"):
+    # Seção de Upload de PDF
+    if has_permission(st.session_state.user_info, 'upload_processos'):
+        with st.expander("📄 Upload de Processo (PDF)", expanded=True):
+            st.markdown("**Faça o upload do arquivo PDF do processo para extrair automaticamente os dados principais.**")
+            
+            uploaded_file = st.file_uploader(
+                "Selecione o arquivo PDF do processo",
+                type=['pdf'],
+                key=f"upload_{key_processos}"
+            )
+            
+            if uploaded_file is not None:
+                # Extrair texto do PDF
+                with st.spinner("🔍 Analisando o arquivo PDF..."):
+                    text = extract_text_from_pdf(uploaded_file)
+                
+                if text:
+                    # Extrair dados do processo
+                    extracted_data = extract_process_data(text)
+                    
+                    if extracted_data:
+                        st.success("✅ Dados extraídos com sucesso!")
+                        
+                        # Mostrar dados extraídos em um formulário editável
+                        with st.form(f"process_from_pdf_{key_processos}"):
+                            st.markdown("#### 📝 Dados Extraídos - Confirme ou Edite")
+                            
+                            col1, col2 = st.columns(2)
+                            
+                            with col1:
+                                numero_processo = st.text_input(
+                                    "Número do Processo",
+                                    value=extracted_data.get('numero_processo', ''),
+                                    help="Número extraído automaticamente do PDF"
+                                )
+                                nome_parte = st.text_input(
+                                    "Nome da Parte",
+                                    value=extracted_data.get('nome_parte', ''),
+                                    help="Nome extraído automaticamente do PDF"
+                                )
+                                horario = st.time_input("Horário", value=datetime.strptime("09:00", "%H:%M").time())
+                            
+                            with col2:
+                                tipo_pericia = st.selectbox(
+                                    "Tipo",
+                                    TIPOS_PERICIA,
+                                    index=TIPOS_PERICIA.index(extracted_data.get('tipo_pericia', 'Auxílio Doença (AD)')),
+                                    help="Tipo identificado automaticamente baseado no conteúdo"
+                                )
+                                situacao = st.selectbox("Situação", SITUACOES_PROCESSO)
+                            
+                            # Mostrar prévia do texto extraído
+                            with st.expander("📄 Prévia do Texto Extraído"):
+                                st.text_area(
+                                    "Texto extraído do PDF (primeiras 1000 caracteres):",
+                                    value=text[:1000] + "..." if len(text) > 1000 else text,
+                                    height=200,
+                                    disabled=True
+                                )
+                            
+                            col1, col2 = st.columns(2)
+                            
+                            with col1:
+                                if st.form_submit_button("✅ Adicionar Processo", type="primary"):
+                                    if numero_processo and nome_parte:
+                                        novo_processo = {
+                                            "numero_processo": numero_processo,
+                                            "nome_parte": nome_parte,
+                                            "horario": horario.strftime("%H:%M"),
+                                            "tipo": tipo_pericia,
+                                            "situacao": situacao,
+                                            "criado_por": st.session_state.username,
+                                            "criado_em": datetime.now().isoformat(),
+                                            "origem": "upload_pdf",
+                                            "arquivo_original": uploaded_file.name
+                                        }
+                                        
+                                        st.session_state.processos[key_processos].append(novo_processo)
+                                        st.success("✅ Processo adicionado com sucesso via upload de PDF!")
+                                        st.rerun()
+                                    else:
+                                        st.error("❌ Número do processo e nome da parte são obrigatórios!")
+                            
+                            with col2:
+                                if st.form_submit_button("❌ Cancelar"):
+                                    st.rerun()
+                    else:
+                        st.warning("⚠️ Não foi possível extrair dados suficientes do PDF. Use o formulário manual abaixo.")
+                        
+                        # Mostrar prévia do texto para debug
+                        with st.expander("📄 Texto Extraído (para análise)"):
+                            st.text_area(
+                                "Texto extraído:",
+                                value=text[:2000] + "..." if len(text) > 2000 else text,
+                                height=300,
+                                disabled=True
+                            )
+                else:
+                    st.error("❌ Não foi possível extrair texto do PDF. Verifique se o arquivo não está protegido ou corrompido.")
+    
+    # Formulário manual para adicionar novo processo
+    with st.expander("➕ Adicionar Processo Manualmente"):
+        with st.form("add_processo_manual"):
             col1, col2 = st.columns(2)
             
             with col1:
@@ -346,7 +531,8 @@ def show_processos_view(data_iso, local_name):
                         "tipo": tipo_pericia,
                         "situacao": situacao,
                         "criado_por": st.session_state.username,
-                        "criado_em": datetime.now().isoformat()
+                        "criado_em": datetime.now().isoformat(),
+                        "origem": "manual"
                     }
                     
                     st.session_state.processos[key_processos].append(novo_processo)
@@ -367,7 +553,9 @@ def show_processos_view(data_iso, local_name):
         # Criar DataFrame para exibição
         df_processos = []
         for i, processo in enumerate(processos_ordenados):
+            origem_icon = "📄" if processo.get('origem') == 'upload_pdf' else "✏️"
             df_processos.append({
+                'Origem': origem_icon,
                 'Horário': processo['horario'],
                 'Número do Processo': processo['numero_processo'],
                 'Nome da Parte': processo['nome_parte'],
@@ -377,6 +565,9 @@ def show_processos_view(data_iso, local_name):
         
         df = pd.DataFrame(df_processos)
         st.dataframe(df, use_container_width=True)
+        
+        # Legenda para os ícones
+        st.markdown("**Legenda:** 📄 = Extraído de PDF | ✏️ = Inserido manualmente")
         
         # Opções de edição/exclusão
         if has_permission(st.session_state.user_info, 'editar_pericias'):
@@ -392,6 +583,10 @@ def show_processos_view(data_iso, local_name):
                     # Encontrar índice do processo
                     indice_processo = opcoes_processos.index(processo_selecionado)
                     processo_atual = processos_ordenados[indice_processo]
+                    
+                    # Mostrar informações sobre a origem do processo
+                    if processo_atual.get('origem') == 'upload_pdf':
+                        st.info(f"📄 Este processo foi extraído do arquivo: {processo_atual.get('arquivo_original', 'N/A')}")
                     
                     # Formulário de edição
                     with st.form("edit_processo"):
@@ -418,7 +613,8 @@ def show_processos_view(data_iso, local_name):
                                         p['nome_parte'] == processo_atual['nome_parte'] and
                                         p['horario'] == processo_atual['horario']):
                                         
-                                        st.session_state.processos[key_processos][i] = {
+                                        # Manter informações de origem
+                                        processo_atualizado = {
                                             "numero_processo": novo_numero,
                                             "nome_parte": novo_nome,
                                             "horario": novo_horario.strftime("%H:%M"),
@@ -427,8 +623,15 @@ def show_processos_view(data_iso, local_name):
                                             "criado_por": processo_atual['criado_por'],
                                             "criado_em": processo_atual['criado_em'],
                                             "editado_por": st.session_state.username,
-                                            "editado_em": datetime.now().isoformat()
+                                            "editado_em": datetime.now().isoformat(),
+                                            "origem": processo_atual.get('origem', 'manual')
                                         }
+                                        
+                                        # Manter arquivo original se existir
+                                        if 'arquivo_original' in processo_atual:
+                                            processo_atualizado['arquivo_original'] = processo_atual['arquivo_original']
+                                        
+                                        st.session_state.processos[key_processos][i] = processo_atualizado
                                         break
                                 
                                 st.success("✅ Processo atualizado com sucesso!")
@@ -448,7 +651,7 @@ def show_processos_view(data_iso, local_name):
         
         # Estatísticas dos processos
         st.markdown("### 📊 Estatísticas dos Processos")
-        col1, col2, col3 = st.columns(3)
+        col1, col2, col3, col4 = st.columns(4)
         
         with col1:
             st.metric("Total de Processos", len(processos_lista))
@@ -461,8 +664,13 @@ def show_processos_view(data_iso, local_name):
             em_andamento = len([p for p in processos_lista if p['situacao'] in ['Pré-laudo', 'Em produção']])
             st.metric("Em Andamento", em_andamento)
         
+        with col4:
+            via_pdf = len([p for p in processos_lista if p.get('origem') == 'upload_pdf'])
+            st.metric("Via PDF", via_pdf)
+        
     else:
         st.info("📭 Nenhum processo cadastrado para esta data/local ainda.")
+
 def main():
     """Função principal do aplicativo"""
     
@@ -712,7 +920,8 @@ def main():
                             perm_agendar_pericias = st.checkbox("Agendar perícias", value=True)
                             perm_editar_pericias = st.checkbox("Editar perícias", value=False)
                             perm_deletar_pericias = st.checkbox("Deletar perícias", value=False)
-                            perm_gerenciar_processos = st.checkbox("Gerenciar processos", value=True)
+                                                        perm_gerenciar_processos = st.checkbox("Gerenciar processos", value=True)
+                            perm_upload_processos = st.checkbox("Upload de processos PDF", value=True)
                             
                         with col2:
                             st.markdown("**📊 Visualização e Filtros**")
@@ -739,7 +948,8 @@ def main():
                                         "gerenciar_usuarios": False,
                                         "acessar_configuracoes_avancadas": False,
                                         "gerenciar_locais_estaduais": perm_gerenciar_locais_estaduais,
-                                        "gerenciar_processos": perm_gerenciar_processos
+                                        "gerenciar_processos": perm_gerenciar_processos,
+                                        "upload_processos": perm_upload_processos
                                     }
                                 else:
                                     permissoes = {}  # Admin tem todas as permissões
