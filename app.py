@@ -308,26 +308,12 @@ def show_processos_view(data_iso, local_name):
     data_br = format_date_br(data_iso)
     st.markdown(f"## 📋 Processos - {data_br}")
     st.markdown(f"**Local:** {local_name}")
-    
-    # Botão para voltar
-    if st.button("← Voltar para " + local_name):
-        st.session_state.selected_date_local = None
-        st.rerun()
-    
-    st.markdown("---")
-    
-    # Chave para identificar os processos desta data/local
-    key_processos = f"{data_iso}_{local_name}"
-    
-    # Inicializar lista de processos se não existir
-    if key_processos not in st.session_state.processos:
-        st.session_state.processos[key_processos] = []
-    
+
     # Formulário para adicionar novo processo
     with st.expander("➕ Adicionar Novo Processo"):
         with st.form("add_processo"):
             col1, col2 = st.columns(2)
-            
+
             with col1:
                 numero_processo = st.text_input("Número do Processo")
                 nome_parte = st.text_input("Nome da Parte")
@@ -337,11 +323,11 @@ def show_processos_view(data_iso, local_name):
                     min_time=datetime.strptime("08:00", "%H:%M").time(),
                     max_time=datetime.strptime("16:45", "%H:%M").time()
                 )
-            
+
             with col2:
                 tipo_pericia = st.selectbox("Tipo", TIPOS_PERICIA)
                 situacao = st.selectbox("Situação", SITUACOES_PROCESSO)
-            
+
             if st.form_submit_button("✅ Adicionar Processo"):
                 if numero_processo and nome_parte:
                     novo_processo = {
@@ -353,12 +339,30 @@ def show_processos_view(data_iso, local_name):
                         "criado_por": st.session_state.username,
                         "criado_em": datetime.now().isoformat()
                     }
-                    
+
+                    # Chave para identificar os processos desta data/local
+                    key_processos = f"{data_iso}_{local_name}"
+                    if key_processos not in st.session_state.processos:
+                        st.session_state.processos[key_processos] = []
                     st.session_state.processos[key_processos].append(novo_processo)
                     st.success("✅ Processo adicionado com sucesso!")
                     st.rerun()
                 else:
                     st.error("❌ Número do processo e nome da parte são obrigatórios!")
+
+    # Botão para voltar
+    if st.button("← Voltar para " + local_name):
+        st.session_state.selected_date_local = None
+        st.rerun()
+
+    st.markdown("---")
+
+    # Chave para identificar os processos desta data/local
+    key_processos = f"{data_iso}_{local_name}"
+
+    # Inicializar lista de processos se não existir
+    if key_processos not in st.session_state.processos:
+        st.session_state.processos[key_processos] = []
     
     # Listar processos existentes
     processos_lista = st.session_state.processos.get(key_processos, [])
