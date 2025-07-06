@@ -453,9 +453,13 @@ def show_processos_view(data_iso, local_name):
                         horario = st.selectbox("Horário", horarios_validos, format_func=lambda t: t.strftime("%H:%M"))
                     
                     with col2:
-                        # Definir índice padrão baseado no tipo extraído
+                        # Definir índice padrão baseado no tipo extraído (com mapeamento)
                         tipo_extraido = extracted_info.get('tipo_pericia', 'Auxílio Doença (AD)')
-                        tipo_index = TIPOS_PERICIA.index(tipo_extraido) if tipo_extraido in TIPOS_PERICIA else 0
+                        tipo_mapeado = {
+                            "Auxílio-Doença": "Auxílio Doença (AD)",
+                            "BPC/LOAS": "Benefício de Prestação Continuada (BPC)"
+                        }.get(tipo_extraido, tipo_extraido)
+                        tipo_index = TIPOS_PERICIA.index(tipo_mapeado) if tipo_mapeado in TIPOS_PERICIA else 0
                         
                         tipo_pericia = st.selectbox("Tipo", TIPOS_PERICIA, index=tipo_index)
                         situacao = st.selectbox("Situação", SITUACOES_PROCESSO)
