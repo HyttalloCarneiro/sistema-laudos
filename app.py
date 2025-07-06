@@ -1232,8 +1232,11 @@ def main():
                                         "criado_por": st.session_state.username,
                                         "criado_em": datetime.now().isoformat()
                                     }
-                                    st.success("✅ Perícia agendada com sucesso!")
-                                    st.session_state.selected_date = None
+                                    st.success("✅ Perícia agendada com sucesso! Redirecionando para gerenciamento de processos...")
+                                    # Redirecionar diretamente para a visualização dos processos desta perícia
+                                    st.session_state.selected_date_local = chave_pericia
+                                    st.session_state.selected_date = None # Limpa a data selecionada do calendário principal
+                                    st.session_state.show_multiple_pericias = False # Garante que não está em modo de múltiplos
                                     st.rerun()
                                 else:
                                     st.error(f"❌ Já existe uma perícia agendada para {local_pericia} nesta data!")
