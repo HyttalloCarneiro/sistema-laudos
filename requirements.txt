@@ -1,4 +1,2 @@
-streamlit
-pypdf
-pandas
-pdfplumber
+streamlit>=1.33.0
+pandas>=2.2.0
