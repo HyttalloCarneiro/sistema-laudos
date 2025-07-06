@@ -487,6 +487,9 @@ def show_processos_view(data_iso, local_name):
                             st.rerun()
                         else:
                             st.error("❌ Número do processo e nome da parte são obrigatórios!")
+                # DEBUG: Exibir dados da sessão após tentativa de adicionar processo
+                st.markdown("### 🔍 Sessão atual de processos:")
+                st.write(st.session_state.processos)
             else:
                 st.warning("⚠️ Não foi possível extrair dados do PDF.")
 
