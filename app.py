@@ -479,11 +479,11 @@ def show_processos_view(data_iso, local_name):
                             # Verificar se já existe processo no mesmo horário
                             horarios_existentes = [p['horario'] for p in st.session_state.processos[key_processos]]
                             if novo_processo['horario'] in horarios_existentes:
-                                st.error(f"⚠️ Já existe um processo agendado para o horário {novo_processo['horario']}.")
-                                st.stop()
-                            st.session_state.processos[key_processos].append(novo_processo)
-                            st.success("✅ Processo do PDF adicionado com sucesso!")
-                            st.rerun()
+                                st.error(f"❌ Este horário já está ocupado: {novo_processo['horario']}. Escolha outro horário.")
+                            else:
+                                st.session_state.processos[key_processos].append(novo_processo)
+                                st.success("✅ Processo do PDF adicionado com sucesso!")
+                                st.rerun()
                         else:
                             st.error("❌ Número do processo e nome da parte são obrigatórios!")
             else:
