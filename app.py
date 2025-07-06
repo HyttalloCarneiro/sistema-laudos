@@ -515,12 +515,14 @@ def show_local_specific_view(local_name):
         passadas_count = len([p for p in pericias_local if datetime.strptime(p['Data_Sort'], '%Y-%m-%d').date() < hoje])
         st.metric("Perícias Realizadas", passadas_count)
 
+def exibir_painel_processos():
+    """Exibe o painel de inclusão e gerenciamento de processos para a data/local selecionados."""
+    data_iso = st.session_state["data_selecionada"]
+    local_name = st.session_state["local_selecionado"]
+    show_processos_view(data_iso, local_name)
+
 def show_processos_view(data_iso, local_name):
     """Mostra a tela de gerenciamento de processos para uma data/local específico - VERSÃO OTIMIZADA"""
-    # Verificação segura de sessão
-    if "local_selecionado" not in st.session_state or "data_selecionada" not in st.session_state:
-        st.warning("Selecione um local e uma data no calendário para continuar.")
-        st.stop()
     data_br = format_date_br(data_iso)
     st.markdown(f"## 📋 Processos - {data_br}")
     st.markdown(f"**Local:** {local_name}")
@@ -1039,7 +1041,11 @@ def main():
                         # Sempre garantir que session_state está preenchido
                         st.session_state["local_selecionado"] = local_name
                         st.session_state["data_selecionada"] = data_iso
-                        show_processos_view(data_iso, local_name)
+                        # SUBSTITUIR CONDICIONAL PELO NOVO PADRÃO
+                        if "local_selecionado" in st.session_state and "data_selecionada" in st.session_state:
+                            exibir_painel_processos()
+                        else:
+                            st.warning("Selecione um local e uma data para prosseguir.")
                     else:
                         st.error("❌ Erro na identificação da data/local. Retornando ao calendário.")
                         st.session_state.selected_date_local = None
