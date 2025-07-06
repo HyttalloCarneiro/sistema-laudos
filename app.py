@@ -482,6 +482,9 @@ def show_processos_view(data_iso, local_name):
                             if novo_processo['horario'] in horarios_existentes:
                                 st.error(f"⚠️ Já existe um processo agendado para o horário {novo_processo['horario']}.")
                                 st.stop()
+                            # Adicionado: Mostrar conteúdo de novo_processo antes de adicionar
+                            st.markdown("### 📄 Conteúdo de `novo_processo`")
+                            st.write(novo_processo)
                             st.session_state.processos[key_processos].append(novo_processo)
                             st.success("✅ Processo do PDF adicionado com sucesso!")
                             # st.rerun()  # Comentado temporariamente para debug
