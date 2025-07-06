@@ -230,6 +230,12 @@ def init_session_data():
     if 'selected_date_local' not in st.session_state:
         st.session_state.selected_date_local = None
     
+    # NOVOS ESTADOS PARA FUNCIONALIDADES ADICIONAIS
+    if 'confirm_ausente_processo' not in st.session_state:
+        st.session_state.confirm_ausente_processo = None
+    
+    if 'certidao_processo' not in st.session_state:
+        st.session_state.certidao_processo = None
 
 def authenticate_user(username, password):
     """Autentica usuário"""
@@ -307,8 +313,8 @@ def create_calendar_view(year, month):
                             use_container_width=True
                         ):
                             # Para múltiplas perícias, mostrar seleção
-                            st.session_state.show_multiple_pericias = True
                             st.session_state.selected_date = date_str
+                            st.session_state.show_multiple_pericias = True
                             st.rerun()
                 else:
                     if cols[i].button(f"{day}", key=f"day_{date_str}", use_container_width=True):
@@ -389,12 +395,17 @@ def show_local_specific_view(local_name):
     # ESTATÍSTICAS OTIMIZADAS - Contagem por dias trabalhados
     st.markdown("### 📊 Estatísticas")
     col1, col2, col3 = st.columns(3)
+    
     with col1:
-        dias_unicos = set(p['Data_Sort'] for p in pericias_local)
-        st.metric("Dias Trabalhados", len(dias_unicos))
+        # Contar DIAS únicos (não processos)
+        dias_trabalhados = len(pericias_local)
+        st.metric("Dias Trabalhados", dias_trabalhados)
+    
     with col2:
+        hoje = datetime.now().date()
         futuras_count = len([p for p in pericias_local if datetime.strptime(p['Data_Sort'], '%Y-%m-%d').date() >= hoje])
         st.metric("Perícias Futuras", futuras_count)
+    
     with col3:
         passadas_count = len([p for p in pericias_local if datetime.strptime(p['Data_Sort'], '%Y-%m-%d').date() < hoje])
         st.metric("Perícias Realizadas", passadas_count)
@@ -420,8 +431,8 @@ def show_processos_view(data_iso, local_name):
     # Inicializar lista de processos se não existir
     if key_processos not in st.session_state.processos:
         st.session_state.processos[key_processos] = []
-
-    # Upload de PDF
+    
+    # NOVO: Upload de PDF
     import datetime
     with st.expander("📄 Upload Processo (PDF)"):
         uploaded_file = st.file_uploader("Selecione o arquivo PDF do processo", type="pdf")
@@ -439,14 +450,21 @@ def show_processos_view(data_iso, local_name):
                 with st.form("add_processo_pdf"):
                     st.markdown("#### Confirmar e Adicionar Processo")
                     col1, col2 = st.columns(2)
+                    
                     with col1:
                         numero_processo = st.text_input("Número do Processo", value=extracted_info.get('numero_processo', ''))
                         nome_parte = st.text_input("Nome da Parte", value=extracted_info.get('nome_parte', ''))
                         horarios_validos = [datetime.time(h, m) for h in range(8, 17) for m in (0, 15, 30, 45)]
                         horario = st.selectbox("Horário", horarios_validos, format_func=lambda t: t.strftime("%H:%M"))
+                    
                     with col2:
-                        tipo_pericia = st.selectbox("Tipo", TIPOS_PERICIA)
+                        # Definir índice padrão baseado no tipo extraído
+                        tipo_extraido = extracted_info.get('tipo_pericia', 'Auxílio Doença (AD)')
+                        tipo_index = TIPOS_PERICIA.index(tipo_extraido) if tipo_extraido in TIPOS_PERICIA else 0
+                        
+                        tipo_pericia = st.selectbox("Tipo", TIPOS_PERICIA, index=tipo_index)
                         situacao = st.selectbox("Situação", SITUACOES_PROCESSO)
+                    
                     if st.form_submit_button("✅ Adicionar Processo do PDF"):
                         if numero_processo and nome_parte:
                             novo_processo = {
@@ -462,11 +480,11 @@ def show_processos_view(data_iso, local_name):
                             # Verificar se já existe processo no mesmo horário
                             horarios_existentes = [p['horario'] for p in st.session_state.processos[key_processos]]
                             if novo_processo['horario'] in horarios_existentes:
-                                st.error(f"❌ Este horário já está ocupado: {novo_processo['horario']}. Escolha outro horário.")
-                            else:
-                                st.session_state.processos[key_processos].append(novo_processo)
-                                st.success("✅ Processo do PDF adicionado com sucesso!")
-                                st.rerun()
+                                st.error(f"⚠️ Já existe um processo agendado para o horário {novo_processo['horario']}.")
+                                st.stop()
+                            st.session_state.processos[key_processos].append(novo_processo)
+                            st.success("✅ Processo do PDF adicionado com sucesso!")
+                            st.rerun()
                         else:
                             st.error("❌ Número do processo e nome da parte são obrigatórios!")
             else:
@@ -583,17 +601,6 @@ def show_processos_view(data_iso, local_name):
                         }
                         st.rerun()
                 with col_a3:
-                    # Certidão de Ausência botão
-                    if processo['situacao'] == "Ausente":
-                        if st.button("📄 Certidão", key=f"certidao_{i}"):
-                            st.session_state.certidao_processo = {
-                                "data_iso": data_iso,
-                                "local_name": local_name,
-                                "nome_parte": processo['nome_parte'],
-                                "numero_processo": processo['numero_processo'],
-                                "horario": processo['horario']
-                            }
-                            st.rerun()
                     if processo['situacao'] != "Ausente":
                         if st.button("❌ Ausente", key=f"ausente_{i}"):
                             st.session_state.confirm_ausente_processo = {
@@ -671,7 +678,6 @@ def show_processos_view(data_iso, local_name):
 
             ---
             """)
-            st.download_button("⬇️ Baixar Certidão", data=st.session_state.certidao_processo['numero_processo'], file_name="certidao.txt")
             if st.button("Fechar Certidão"):
                 st.session_state.certidao_processo = None
                 st.rerun()
@@ -748,11 +754,18 @@ def show_processos_view(data_iso, local_name):
         
         # ESTATÍSTICAS OTIMIZADAS DOS PROCESSOS
         st.markdown("### 📊 Estatísticas de Perícias")
-        col1, col2 = st.columns(2)
+        col1, col2, col3 = st.columns(3)
+        
         with col1:
+            st.metric("Total de Processos", len(processos_lista))
+        
+        with col2:
+            # Total de Perícias Realizadas (Concluídas)
             concluidos = len([p for p in processos_lista if p['situacao'] == 'Concluído'])
             st.metric("Perícias Realizadas", concluidos)
-        with col2:
+        
+        with col3:
+            # Total de Ausências
             ausentes = len([p for p in processos_lista if p['situacao'] == 'Ausente'])
             st.metric("Total de Ausências", ausentes)
         
@@ -1266,25 +1279,31 @@ def main():
                 # NOVA FUNCIONALIDADE: PESQUISA DE PROCESSOS
                 st.markdown("---")
                 st.markdown("### 🔍 Pesquisar Processos")
-
+                
                 search_query = st.text_input(
                     "Pesquisar por número do processo ou nome do autor:",
                     placeholder="Digite o número do processo ou nome do autor..."
                 )
-
+                
                 if search_query:
                     st.markdown("#### 📋 Resultados da Pesquisa")
+                    
+                    # Buscar em todos os processos
                     resultados = []
                     for key_processos, processos_lista in st.session_state.processos.items():
+                        # Extrair data e local da chave
                         if '_' in key_processos:
                             parts = key_processos.split('_')
                             data_iso = parts[0]
                             local_name = '_'.join(parts[1:])
                         else:
                             continue
+                        
                         for processo in processos_lista:
+                            # Verificar se a busca corresponde
                             if (search_query.lower() in processo['numero_processo'].lower() or 
                                 search_query.lower() in processo['nome_parte'].lower()):
+                                
                                 resultados.append({
                                     'Data': format_date_br(data_iso),
                                     'Local': local_name,
@@ -1295,6 +1314,7 @@ def main():
                                     'Situação': processo['situacao'],
                                     'Criado por': processo['criado_por']
                                 })
+                    
                     if resultados:
                         st.success(f"🔍 Encontrados {len(resultados)} resultado(s)")
                         df_resultados = pd.DataFrame(resultados)
