@@ -448,10 +448,28 @@ def show_processos_view(data_iso, local_name):
 
                 # Formulário para confirmar/editar dados extraídos
                 with st.form("add_processo_pdf"):
-                    st.markdown("⚙️ Teste: Clique no botão abaixo para confirmar funcionamento do formulário.")
-                    # Botão de submit de teste
+                    numero_processo = st.text_input("Número do Processo", value=extracted_info.get('numero_processo', ''))
+                    nome_parte = st.text_input("Nome da Parte", value=extracted_info.get('nome_parte', ''))
+                    # Horários válidos
+                    horarios_validos = [datetime.time(h, m) for h in range(8, 17) for m in (0, 15, 30, 45)]
+                    horario = st.selectbox("Horário", horarios_validos, format_func=lambda t: t.strftime("%H:%M"))
+                    tipo_pericia = st.selectbox("Tipo", TIPOS_PERICIA, index=0)
+                    situacao = st.selectbox("Situação", SITUACOES_PROCESSO, index=0)
                     if st.form_submit_button("✅ Adicionar Processo do PDF"):
-                        st.success("✅ Botão foi clicado com sucesso! O formulário está funcionando.")
+                        novo_processo = {
+                            "numero": numero_processo,
+                            "nome": nome_parte,
+                            "tipo": tipo_pericia,
+                            "situacao": situacao,
+                            "horario": horario.strftime("%H:%M")
+                        }
+                        horarios_existentes = [p['horario'] for p in st.session_state.processos[key_processos]]
+                        if novo_processo["horario"] in horarios_existentes:
+                            st.error(f"⚠️ Já existe um processo agendado para o horário {novo_processo['horario']}.")
+                        else:
+                            st.session_state.processos[key_processos].append(novo_processo)
+                            st.success("✅ Processo do PDF adicionado com sucesso!")
+                            st.rerun()
             else:
                 st.warning("⚠️ Não foi possível extrair dados do PDF.")
 
@@ -528,35 +546,37 @@ def show_processos_view(data_iso, local_name):
             
             with col1:
                 origem_icon = "📄" if processo.get('origem') == 'pdf' else "✏️"
-                st.write(f"{origem_icon} {processo['horario']}")
+                st.write(f"{origem_icon} {processo.get('horario','')}")
             
             with col2:
-                st.write(processo['numero_processo'])
+                st.write(processo.get('numero_processo', processo.get('numero', '')))
             
             with col3:
-                st.write(processo['nome_parte'])
+                st.write(processo.get('nome_parte', processo.get('nome', '')))
             
             with col4:
                 # Extrair apenas a abreviação do tipo
-                tipo_abrev = processo['tipo'].split('(')[1].replace(')', '') if '(' in processo['tipo'] else processo['tipo']
+                tipo_field = processo.get('tipo', '')
+                tipo_abrev = tipo_field.split('(')[1].replace(')', '') if '(' in tipo_field else tipo_field
                 st.write(tipo_abrev)
             
             with col5:
                 # Cor baseada na situação
-                if processo['situacao'] == 'Concluído':
-                    st.success(processo['situacao'])
-                elif processo['situacao'] == 'Em produção':
-                    st.warning(processo['situacao'])
-                elif processo['situacao'] == 'Ausente':
-                    st.error(processo['situacao'])
+                sit = processo.get('situacao','')
+                if sit == 'Concluído':
+                    st.success(sit)
+                elif sit == 'Em produção':
+                    st.warning(sit)
+                elif sit == 'Ausente':
+                    st.error(sit)
                 else:
-                    st.info(processo['situacao'])
+                    st.info(sit)
             
             with col6:
                 col_a1, col_a2, col_a3 = st.columns([1, 1, 1])
                 with col_a1:
                     if st.button("📝 Laudo", key=f"laudo_{i}"):
-                        st.info(f"Laudo para {processo['numero_processo']} ainda não implementado.")
+                        st.info(f"Laudo para {processo.get('numero_processo', processo.get('numero', ''))} ainda não implementado.")
                 with col_a2:
                     if st.button("🗑️ Excluir", key=f"excluir_{i}"):
                         st.session_state.confirm_delete_processo = {
@@ -566,7 +586,7 @@ def show_processos_view(data_iso, local_name):
                         }
                         st.rerun()
                 with col_a3:
-                    if processo['situacao'] != "Ausente":
+                    if processo.get('situacao','') != "Ausente":
                         if st.button("❌ Ausente", key=f"ausente_{i}"):
                             st.session_state.confirm_ausente_processo = {
                                 "index": i,
