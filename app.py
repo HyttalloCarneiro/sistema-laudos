@@ -5,6 +5,49 @@ from datetime import datetime, date
 import json
 import locale
 import pypdf as PyPDF2
+import pdfplumber
+import unicodedata
+from typing import Set
+def normalizar_texto(texto: str) -> str:
+    texto = ''.join(c for c in unicodedata.normalize('NFD', texto)
+                    if unicodedata.category(c) != 'Mn')
+    return texto.lower().strip()
+
+def identificar_tipo_beneficio(tipos_encontrados: Set[str], primeira_pagina_texto: str) -> str:
+    primeira_pagina_texto = normalizar_texto(primeira_pagina_texto)
+    if len(tipos_encontrados) > 1:
+        if any(t in primeira_pagina_texto for t in ["aposentadoria", "temporaria", "temporario", "reestabelecimento", "previdenciario"]):
+            return "Auxílio-Doença"
+        elif any(t in primeira_pagina_texto for t in ["assistencial", "bpc", "loas"]):
+            return "BPC/LOAS"
+        else:
+            return "DÚVIDA ENTRE Auxílio-Doença E BPC/LOAS: FAVOR ESCOLHER MANUALMENTE"
+    elif len(tipos_encontrados) == 1:
+        return next(iter(tipos_encontrados))
+    return "Nenhum tipo identificado"
+
+def extrair_dados_pdf(pdf_file):
+    with pdfplumber.open(pdf_file) as pdf:
+        primeira_pagina = pdf.pages[0]
+        texto = primeira_pagina.extract_text()
+        texto_lower = normalizar_texto(texto)
+
+        match = re.search(r'([A-Z\s]{5,})(?=\s+(REU|RÉU|AUTOR))', texto)
+        nome_autor = match.group(1).strip().title() if match else ""
+        if re.search(r'advogado|procurador|data de entrada', nome_autor, re.IGNORECASE):
+            nome_autor = ""
+
+        tipos_encontrados = set()
+        if "auxílio-doença" in texto_lower or "auxilio doença" in texto_lower:
+            tipos_encontrados.add("Auxílio-Doença")
+        if "bpc" in texto_lower or "loas" in texto_lower or "assistencial" in texto_lower:
+            tipos_encontrados.add("BPC/LOAS")
+        tipo = identificar_tipo_beneficio(tipos_encontrados, texto)
+
+        numero = re.search(r"\d{7}-\d{2}.\d{4}.\d{1,2}.\d{2}.\d{4}", texto)
+        numero_processo = numero.group(0) if numero else "0000000-00.0000.0.00.0000"
+
+        return numero_processo, nome_autor, tipo
 import re
 import io
 
@@ -499,52 +542,53 @@ def show_processos_view(data_iso, local_name):
         uploaded_file = st.file_uploader("Selecione o arquivo PDF do processo", type="pdf")
         if uploaded_file:
             st.write("Processando PDF...")
-            pdf_text = extract_text_from_pdf(uploaded_file)
-            if pdf_text:
-                extracted_info = extract_process_data(pdf_text)
-                st.subheader("Dados Extraídos do PDF:")
-                st.write(f"**Número do Processo:** {extracted_info.get('numero_processo', 'Não encontrado')}")
-                st.write(f"**Nome da Parte:** {extracted_info.get('nome_parte', 'Não encontrado')}")
-                st.write(f"**Tipo de Perícia:** {extracted_info.get('tipo_pericia', 'Não encontrado')}")
-
-                # Formulário para confirmar/editar dados extraídos
-                with st.form("add_processo_pdf"):
-                    st.markdown("#### Confirmar e Adicionar Processo")
-                    col1, col2 = st.columns(2)
-                    
-                    with col1:
-                        numero_processo = st.text_input("Número do Processo", value=extracted_info.get('numero_processo', ''))
-                        nome_parte = st.text_input("Nome da Parte", value=extracted_info.get('nome_parte', ''))
-                        horario = st.time_input("Horário", value=datetime.strptime("09:00", "%H:%M").time())
-                    
-                    with col2:
-                        # Definir índice padrão baseado no tipo extraído
-                        tipo_extraido = extracted_info.get('tipo_pericia', 'Auxílio Doença (AD)')
-                        tipo_index = TIPOS_PERICIA.index(tipo_extraido) if tipo_extraido in TIPOS_PERICIA else 0
-                        
-                        tipo_pericia = st.selectbox("Tipo", TIPOS_PERICIA, index=tipo_index)
-                        situacao = st.selectbox("Situação", SITUACOES_PROCESSO)
-                    
-                    if st.form_submit_button("✅ Adicionar Processo do PDF"):
-                        if numero_processo and nome_parte:
-                            novo_processo = {
-                                "numero_processo": numero_processo,
-                                "nome_parte": nome_parte,
-                                "horario": horario.strftime("%H:%M"),
-                                "tipo": tipo_pericia,
-                                "situacao": situacao,
-                                "criado_por": st.session_state.username,
-                                "criado_em": datetime.now().isoformat(),
-                                "origem": "pdf"
-                            }
-                            
-                            st.session_state.processos[key_processos].append(novo_processo)
-                            st.success("✅ Processo do PDF adicionado com sucesso!")
-                            st.rerun()
-                        else:
-                            st.error("❌ Número do processo e nome da parte são obrigatórios!")
-            else:
+            try:
+                numero_processo, nome_parte, tipo_extraido = extrair_dados_pdf(uploaded_file)
+            except Exception as e:
                 st.warning("⚠️ Não foi possível extrair dados do PDF.")
+                numero_processo, nome_parte, tipo_extraido = "", "", ""
+            st.subheader("Dados Extraídos do PDF:")
+            st.write(f"**Número do Processo:** {numero_processo or 'Não encontrado'}")
+            st.write(f"**Nome da Parte:** {nome_parte or 'Não encontrado'}")
+            st.write(f"**Tipo de Perícia:** {tipo_extraido or 'Não encontrado'}")
+
+            # Formulário para confirmar/editar dados extraídos
+            with st.form("add_processo_pdf"):
+                st.markdown("#### Confirmar e Adicionar Processo")
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    numero_processo_in = st.text_input("Número do Processo", value=numero_processo or '')
+                    nome_parte_in = st.text_input("Nome da Parte", value=nome_parte or '')
+                    horarios_validos = [datetime.time(h, m) for h in range(8, 17) for m in (0, 15, 30, 45)]
+                    horario = st.selectbox("Horário", horarios_validos, format_func=lambda t: t.strftime("%H:%M"))
+                
+                with col2:
+                    tipo_index = TIPOS_PERICIA.index(tipo_extraido) if tipo_extraido in TIPOS_PERICIA else 0
+                    tipo_pericia = st.selectbox("Tipo", TIPOS_PERICIA, index=tipo_index)
+                    situacao = st.selectbox("Situação", SITUACOES_PROCESSO)
+                
+                if st.form_submit_button("✅ Adicionar Processo do PDF"):
+                    if numero_processo_in and nome_parte_in:
+                        horarios_existentes = [p['horario'] for p in st.session_state.processos[key_processos]]
+                        if horario.strftime("%H:%M") in horarios_existentes:
+                            st.error("⚠️ Já existe um processo agendado para esse horário.")
+                            return
+                        novo_processo = {
+                            "numero_processo": numero_processo_in,
+                            "nome_parte": nome_parte_in,
+                            "horario": horario.strftime("%H:%M"),
+                            "tipo": tipo_pericia,
+                            "situacao": situacao,
+                            "criado_por": st.session_state.username,
+                            "criado_em": datetime.now().isoformat(),
+                            "origem": "pdf"
+                        }
+                        st.session_state.processos[key_processos].append(novo_processo)
+                        st.success("✅ Processo do PDF adicionado com sucesso!")
+                        st.rerun()
+                    else:
+                        st.error("❌ Número do processo e nome da parte são obrigatórios!")
 
     # Formulário para adicionar novo processo manualmente
     with st.expander("➕ Adicionar Novo Processo Manualmente"):
@@ -554,7 +598,8 @@ def show_processos_view(data_iso, local_name):
             with col1:
                 numero_processo = st.text_input("Número do Processo")
                 nome_parte = st.text_input("Nome da Parte")
-                horario = st.time_input("Horário", value=datetime.strptime("09:00", "%H:%M").time())
+                horarios_validos = [datetime.time(h, m) for h in range(8, 17) for m in (0, 15, 30, 45)]
+                horario = st.selectbox("Horário", horarios_validos, format_func=lambda t: t.strftime("%H:%M"))
             
             with col2:
                 tipo_pericia = st.selectbox("Tipo", TIPOS_PERICIA)
@@ -562,6 +607,10 @@ def show_processos_view(data_iso, local_name):
             
             if st.form_submit_button("✅ Adicionar Processo"):
                 if numero_processo and nome_parte:
+                    horarios_existentes = [p['horario'] for p in st.session_state.processos[key_processos]]
+                    if horario.strftime("%H:%M") in horarios_existentes:
+                        st.error("⚠️ Já existe um processo agendado para esse horário.")
+                        return
                     novo_processo = {
                         "numero_processo": numero_processo,
                         "nome_parte": nome_parte,
@@ -572,7 +621,6 @@ def show_processos_view(data_iso, local_name):
                         "criado_em": datetime.now().isoformat(),
                         "origem": "manual"
                     }
-                    
                     st.session_state.processos[key_processos].append(novo_processo)
                     st.success("✅ Processo adicionado com sucesso!")
                     st.rerun()
@@ -611,24 +659,22 @@ def show_processos_view(data_iso, local_name):
         # Linhas da tabela
         for i, processo in enumerate(processos_ordenados):
             col1, col2, col3, col4, col5, col6 = st.columns([1, 2, 3, 1, 1, 1])
-            
+
             with col1:
                 origem_icon = "📄" if processo.get('origem') == 'pdf' else "✏️"
                 st.write(f"{origem_icon} {processo['horario']}")
-            
+
             with col2:
                 st.write(processo['numero_processo'])
-            
+
             with col3:
                 st.write(processo['nome_parte'])
-            
+
             with col4:
-                # Extrair apenas a abreviação do tipo
                 tipo_abrev = processo['tipo'].split('(')[1].replace(')', '') if '(' in processo['tipo'] else processo['tipo']
                 st.write(tipo_abrev)
-            
+
             with col5:
-                # Cor baseada na situação
                 if processo['situacao'] == 'Concluído':
                     st.success(processo['situacao'])
                 elif processo['situacao'] == 'Em produção':
@@ -637,30 +683,67 @@ def show_processos_view(data_iso, local_name):
                     st.error(processo['situacao'])
                 else:
                     st.info(processo['situacao'])
-            
+
             with col6:
-                # NOVO: Botões de ação baseados na situação
-                if processo['situacao'] == 'Ausente':
-                    # Botão para gerar certidão
-                    if st.button("📄 Certidão", key=f"cert_{i}", help="Gerar Certidão de Ausência"):
-                        st.session_state.certidao_processo = {
-                            "numero_processo": processo['numero_processo'],
-                            "nome_parte": processo['nome_parte'],
-                            "horario": processo['horario'],
-                            "data_iso": data_iso,
-                            "local_name": local_name
-                        }
-                        st.rerun()
-                else:
-                    # Botão para marcar como ausente
-                    if st.button("❌ Ausente", key=f"ausente_{i}", help="Marcar como Ausente"):
-                        st.session_state.confirm_ausente_processo = {
+                col_a1, col_a2, col_a3 = st.columns([1, 1, 1])
+                with col_a1:
+                    if st.button("📝 Laudo", key=f"laudo_{i}"):
+                        st.info("Função de redação de laudo ainda não implementada.")
+                with col_a2:
+                    if st.button("🗑️ Excluir", key=f"excluir_{i}"):
+                        st.session_state.confirm_delete_processo = {
                             "index": i,
                             "processo": processo,
                             "key_processos": key_processos
                         }
                         st.rerun()
-            
+                with col_a3:
+                    if processo['situacao'] != "Ausente":
+                        if st.button("❌ Ausente", key=f"ausente_{i}"):
+                            st.session_state.confirm_ausente_processo = {
+                                "index": i,
+                                "processo": processo,
+                                "key_processos": key_processos
+                            }
+                            st.rerun()
+
+            st.markdown("---")
+
+        # Confirmação de exclusão e ausência
+        if st.session_state.get('confirm_delete_processo'):
+            del_data = st.session_state.confirm_delete_processo
+            processo = del_data['processo']
+            st.warning("⚠️ **CONFIRMAR EXCLUSÃO?**")
+            st.write(f"Tem certeza que deseja EXCLUIR o processo **{processo['numero_processo']}** de **{processo['nome_parte']}**?")
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                if st.button("❌ Cancelar", key="cancel_delete"):
+                    st.session_state.confirm_delete_processo = None
+                    st.rerun()
+            with col3:
+                if st.button("✅ CONFIRMAR EXCLUSÃO", key="confirm_delete"):
+                    del st.session_state.processos[del_data['key_processos']][del_data['index']]
+                    st.session_state.confirm_delete_processo = None
+                    st.success("✅ Processo excluído com sucesso!")
+                    st.rerun()
+            st.markdown("---")
+
+        if st.session_state.get('confirm_ausente_processo'):
+            aus_data = st.session_state.confirm_ausente_processo
+            processo = aus_data['processo']
+            st.warning("⚠️ **CONFIRMAR AUSÊNCIA?**")
+            st.write(f"Tem certeza que deseja marcar como AUSENTE o processo **{processo['numero_processo']}** de **{processo['nome_parte']}**?")
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                if st.button("❌ Cancelar", key="cancel_ausente"):
+                    st.session_state.confirm_ausente_processo = None
+                    st.rerun()
+            with col3:
+                if st.button("✅ CONFIRMAR AUSÊNCIA", key="confirm_ausente"):
+                    st.session_state.processos[aus_data['key_processos']][aus_data['index']]['situacao'] = "Ausente"
+                    st.session_state.confirm_ausente_processo = None
+                    st.success("✅ Situação alterada para 'Ausente'.")
+                    st.rerun()
             st.markdown("---")
         
         # Legenda
