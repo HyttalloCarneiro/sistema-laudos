@@ -216,6 +216,9 @@ def create_calendar_view(year, month):
 
 def show_local_specific_view(local_name):
     """Mostra visualização específica de um local"""
+    if not local_name or not isinstance(local_name, str):
+        st.error("❌ Erro: Nome do local não definido corretamente.")
+        return
     st.markdown(f"## 📍 {local_name}")
     st.markdown("---")
     
