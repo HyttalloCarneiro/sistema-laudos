@@ -240,42 +240,38 @@ def show_local_specific_view(local_name):
     if pericias_local:
         # Separar por futuras e passadas
         hoje = datetime.now().date()
-        
         futuras = []
         passadas = []
-        
         for pericia in pericias_local:
             data_pericia = datetime.strptime(pericia['Data_Sort'], '%Y-%m-%d').date()
             if data_pericia >= hoje:
                 futuras.append(pericia)
             else:
                 passadas.append(pericia)
-        
         # Mostrar perícias futuras com datas clicáveis
         if futuras:
             st.markdown("### 📅 Perícias Agendadas")
-            
             for pericia in sorted(futuras, key=lambda x: x['Data_Sort']):
                 col1, col2, col3, col4 = st.columns([2, 3, 3, 2])
-                
                 with col1:
-                    # Data clicável
-                    if st.button(f"📅 {pericia['Data']}", key=f"date_click_{pericia['Data_ISO']}_{local_name}"):
-                        st.session_state.selected_date_local = f"{pericia['Data_ISO']}_{local_name}"
-                        st.rerun()
-                
+                    # Data clicável: ao clicar, define session_state.data_selecionada e local_selecionado
+                    data_formatada = pericia['Data']
+                    data = pericia['Data_ISO']
+                    local = local_name
+                    if st.button(data_formatada, key=f"btn_{data}_{local}"):
+                        st.session_state.data_selecionada = data
+                        st.session_state.local_selecionado = local
+                        st.session_state.selected_date_local = f"{data}_{local}"
+                        st.experimental_rerun()
                 with col2:
                     st.write(f"**Local:** {local_name}")
-                
                 with col3:
                     st.write(f"**Obs:** {pericia['Observações']}")
-                
                 with col4:
                     # Contar processos para esta data/local
                     key_processos = f"{pericia['Data_ISO']}_{local_name}"
                     num_processos = len(st.session_state.processos.get(key_processos, []))
                     st.write(f"**Processos:** {num_processos}")
-        
         # Mostrar perícias passadas
         if passadas:
             st.markdown("### 📋 Histórico de Perícias")
@@ -610,6 +606,9 @@ def main():
                     if len(parts) >= 2:
                         data_iso = parts[0]
                         local_name = '_'.join(parts[1:])  # Reconstroi o nome do local caso tenha underscores
+                        # Definir session_state.data_selecionada e local_selecionado para uso no formulário
+                        st.session_state.data_selecionada = data_iso
+                        st.session_state.local_selecionado = local_name
                         show_processos_view(data_iso, local_name)
                     else:
                         st.error("❌ Erro na identificação da data/local. Retornando ao calendário.")
