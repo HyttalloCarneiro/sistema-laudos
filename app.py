@@ -605,25 +605,19 @@ def main():
         
         # Verificar qual tela mostrar
         if st.session_state.selected_date_local:
-            # CORREÇÃO DO ERRO: Verificar se a string contém underscore antes de fazer split
             try:
-                if '_' in st.session_state.selected_date_local:
-                    parts = st.session_state.selected_date_local.split('_')
-                    if len(parts) >= 2:
-                        data_iso = parts[0]
-                        local_name = '_'.join(parts[1:])  # Reconstroi o nome do local caso tenha underscores
-                        # Definir session_state.data_selecionada e local_selecionado para uso no formulário
-                        st.session_state.data_selecionada = data_iso
-                        st.session_state.local_selecionado = local_name
-                        show_processos_view(data_iso, local_name)
-                    else:
-                        st.error("❌ Erro na identificação da data/local. Retornando ao calendário.")
-                        st.session_state.selected_date_local = None
-                        st.rerun()
-                else:
-                    st.error("❌ Formato inválido para data/local. Retornando ao calendário.")
-                    st.session_state.selected_date_local = None
-                    st.rerun()
+                parts = st.session_state.selected_date_local.split('_')
+                if len(parts) < 2:
+                    raise ValueError("Formato inválido (esperado 'data_local')")
+
+                data_iso = parts[0]
+                local_name = '_'.join(parts[1:])  # Reconstroi o nome do local
+                if not data_iso or not local_name:
+                    raise ValueError("Data ou local vazios")
+
+                st.session_state.data_selecionada = data_iso
+                st.session_state.local_selecionado = local_name
+                show_processos_view(data_iso, local_name)
             except Exception as e:
                 st.error(f"❌ Erro ao processar data/local: {str(e)}")
                 st.session_state.selected_date_local = None
