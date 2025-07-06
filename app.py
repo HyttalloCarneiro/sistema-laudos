@@ -463,13 +463,13 @@ def show_processos_view(data_iso, local_name):
                             "situacao": situacao,
                             "horario": horario.strftime("%H:%M")
                         }
-                        horarios_existentes = [p['horario'] for p in st.session_state.processos[key_processos]]
-                        if novo_processo["horario"] in horarios_existentes:
-                            st.error(f"⚠️ Já existe um processo agendado para o horário {novo_processo['horario']}.")
-                        else:
-                            st.session_state.processos[key_processos].append(novo_processo)
-                            st.success("✅ Processo do PDF adicionado com sucesso!")
-                            st.rerun()
+
+                        st.markdown("### 🐞 DEPURAÇÃO")
+                        st.write("🔑 key_processos:", key_processos)
+                        st.write("📄 novo_processo:", novo_processo)
+                        st.write("📚 Lista atual para esta chave:", st.session_state.processos.get(key_processos, "Chave não existe"))
+                        st.write("📦 Todas as chaves em session_state.processos:", list(st.session_state.processos.keys()))
+                        # st.rerun()
             else:
                 st.warning("⚠️ Não foi possível extrair dados do PDF.")
 
