@@ -1044,45 +1044,45 @@ def main():
 
         # O código abaixo pode ser mantido como referência, ou removido se desnecessário.
         # --- FIM PATCH ---
-            # Gerenciamento de locais estaduais
-            st.markdown("### 🏛️ Gerenciar Locais Estaduais")
-            
-            # Adicionar novo local estadual
-            with st.form("add_local_estadual"):
-                st.markdown("#### ➕ Adicionar Novo Local Estadual")
-                novo_local = st.text_input("Nome do Local")
-                
-                if st.form_submit_button("Adicionar Local"):
-                    if novo_local and novo_local not in st.session_state.locais_estaduais:
-                        st.session_state.locais_estaduais.append(novo_local)
-                        # Manter ordem alfabética
-                        st.session_state.locais_estaduais.sort()
-                        st.success(f"✅ Local '{novo_local}' adicionado com sucesso!")
-                        st.rerun()
-                    elif novo_local in st.session_state.locais_estaduais:
-                        st.error("❌ Este local já existe!")
-                    else:
-                        st.error("❌ Por favor, insira um nome para o local!")
-            
-            # Listar e gerenciar locais existentes
-            locais_estaduais_ordenados = sorted(st.session_state.locais_estaduais)
-            if locais_estaduais_ordenados:
-                st.markdown("#### 📋 Locais Estaduais Cadastrados")
-                for local in locais_estaduais_ordenados:
-                    col1, col2 = st.columns([4, 1])
-                    with col1:
-                        st.write(f"📍 {local}")
-                    with col2:
-                        if st.button("🗑️", key=f"del_estadual_{local}"):
-                            st.session_state.locais_estaduais.remove(local)
-                            st.success(f"Local '{local}' removido!")
-                            st.rerun()
-            else:
-                st.info("📭 Nenhum local estadual cadastrado ainda.")
-            
-            st.markdown("---")
+        # Gerenciamento de locais estaduais
+        st.markdown("### 🏛️ Gerenciar Locais Estaduais")
         
-        elif st.session_state.show_change_password:
+        # Adicionar novo local estadual
+        with st.form("add_local_estadual"):
+            st.markdown("#### ➕ Adicionar Novo Local Estadual")
+            novo_local = st.text_input("Nome do Local")
+            
+            if st.form_submit_button("Adicionar Local"):
+                if novo_local and novo_local not in st.session_state.locais_estaduais:
+                    st.session_state.locais_estaduais.append(novo_local)
+                    # Manter ordem alfabética
+                    st.session_state.locais_estaduais.sort()
+                    st.success(f"✅ Local '{novo_local}' adicionado com sucesso!")
+                    st.rerun()
+                elif novo_local in st.session_state.locais_estaduais:
+                    st.error("❌ Este local já existe!")
+                else:
+                    st.error("❌ Por favor, insira um nome para o local!")
+        
+        # Listar e gerenciar locais existentes
+        locais_estaduais_ordenados = sorted(st.session_state.locais_estaduais)
+        if locais_estaduais_ordenados:
+            st.markdown("#### 📋 Locais Estaduais Cadastrados")
+            for local in locais_estaduais_ordenados:
+                col1, col2 = st.columns([4, 1])
+                with col1:
+                    st.write(f"📍 {local}")
+                with col2:
+                    if st.button("🗑️", key=f"del_estadual_{local}"):
+                        st.session_state.locais_estaduais.remove(local)
+                        st.success(f"Local '{local}' removido!")
+                        st.rerun()
+        else:
+            st.info("📭 Nenhum local estadual cadastrado ainda.")
+        
+        st.markdown("---")
+        
+        if st.session_state.show_change_password:
             # Formulário para mudar senha
             st.markdown("### 🔑 Alterar Senha")
             
