@@ -1,9 +1,3 @@
-# Função de normalização de chave para processos
-import unicodedata
-def normalize_key(data_iso, local_name):
-    local_normalized = unicodedata.normalize('NFKD', local_name).encode('ASCII', 'ignore').decode('utf-8')
-    local_normalized = local_normalized.replace(" ", "_").lower()
-    return f"{data_iso}_{local_normalized}"
 # -*- coding: utf-8 -*-
 import streamlit as st
 import pandas as pd
@@ -236,12 +230,6 @@ def init_session_data():
     if 'selected_date_local' not in st.session_state:
         st.session_state.selected_date_local = None
     
-    # NOVOS ESTADOS PARA FUNCIONALIDADES ADICIONAIS
-    if 'confirm_ausente_processo' not in st.session_state:
-        st.session_state.confirm_ausente_processo = None
-    
-    if 'certidao_processo' not in st.session_state:
-        st.session_state.certidao_processo = None
 
 def authenticate_user(username, password):
     """Autentica usuário"""
@@ -427,13 +415,13 @@ def show_processos_view(data_iso, local_name):
     st.markdown("---")
     
     # Chave para identificar os processos desta data/local
-    key_processos = normalize_key(data_iso, local_name)
+    key_processos = f"{data_iso}_{local_name}"
     
     # Inicializar lista de processos se não existir
     if key_processos not in st.session_state.processos:
         st.session_state.processos[key_processos] = []
-    
-    # NOVO: Upload de PDF
+
+    # Upload de PDF
     import datetime
     with st.expander("📄 Upload Processo (PDF)"):
         uploaded_file = st.file_uploader("Selecione o arquivo PDF do processo", type="pdf")
@@ -451,28 +439,15 @@ def show_processos_view(data_iso, local_name):
                 with st.form("add_processo_pdf"):
                     st.markdown("#### Confirmar e Adicionar Processo")
                     col1, col2 = st.columns(2)
-                    
                     with col1:
                         numero_processo = st.text_input("Número do Processo", value=extracted_info.get('numero_processo', ''))
                         nome_parte = st.text_input("Nome da Parte", value=extracted_info.get('nome_parte', ''))
                         horarios_validos = [datetime.time(h, m) for h in range(8, 17) for m in (0, 15, 30, 45)]
                         horario = st.selectbox("Horário", horarios_validos, format_func=lambda t: t.strftime("%H:%M"))
-                    
                     with col2:
-                        # Definir índice padrão baseado no tipo extraído (com mapeamento)
-                        tipo_extraido = extracted_info.get('tipo_pericia', 'Auxílio Doença (AD)')
-                        tipo_mapeado = {
-                            "Auxílio-Doença": "Auxílio Doença (AD)",
-                            "BPC/LOAS": "Benefício de Prestação Continuada (BPC)"
-                        }.get(tipo_extraido, tipo_extraido)
-                        tipo_index = TIPOS_PERICIA.index(tipo_mapeado) if tipo_mapeado in TIPOS_PERICIA else 0
-                        
-                        tipo_pericia = st.selectbox("Tipo", TIPOS_PERICIA, index=tipo_index)
+                        tipo_pericia = st.selectbox("Tipo", TIPOS_PERICIA)
                         situacao = st.selectbox("Situação", SITUACOES_PROCESSO)
-                    
                     if st.form_submit_button("✅ Adicionar Processo do PDF"):
-                        # Recalcular key_processos usando a função de normalização
-                        key_processos = normalize_key(data_iso, local_name)
                         if numero_processo and nome_parte:
                             novo_processo = {
                                 "numero_processo": numero_processo,
@@ -489,9 +464,6 @@ def show_processos_view(data_iso, local_name):
                             if novo_processo['horario'] in horarios_existentes:
                                 st.error(f"❌ Este horário já está ocupado: {novo_processo['horario']}. Escolha outro horário.")
                             else:
-                                # Adicionado: inicializar lista se não existir
-                                if key_processos not in st.session_state.processos:
-                                    st.session_state.processos[key_processos] = []
                                 st.session_state.processos[key_processos].append(novo_processo)
                                 st.success("✅ Processo do PDF adicionado com sucesso!")
                                 st.rerun()
