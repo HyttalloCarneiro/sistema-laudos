@@ -517,6 +517,10 @@ def show_local_specific_view(local_name):
 
 def show_processos_view(data_iso, local_name):
     """Mostra a tela de gerenciamento de processos para uma data/local específico - VERSÃO OTIMIZADA"""
+    # Verificação segura de sessão
+    if "local_selecionado" not in st.session_state or "data_selecionada" not in st.session_state:
+        st.warning("Selecione um local e uma data no calendário para continuar.")
+        st.stop()
     data_br = format_date_br(data_iso)
     st.markdown(f"## 📋 Processos - {data_br}")
     st.markdown(f"**Local:** {local_name}")
@@ -1032,6 +1036,9 @@ def main():
                     if len(parts) >= 2:
                         data_iso = parts[0]
                         local_name = '_'.join(parts[1:])  # Reconstroi o nome do local caso tenha underscores
+                        # Sempre garantir que session_state está preenchido
+                        st.session_state["local_selecionado"] = local_name
+                        st.session_state["data_selecionada"] = data_iso
                         show_processos_view(data_iso, local_name)
                     else:
                         st.error("❌ Erro na identificação da data/local. Retornando ao calendário.")
@@ -1264,6 +1271,9 @@ def main():
                         col1, col2 = st.columns(2)
                         with col1:
                             if st.button("📋 Ver Processos", type="primary"):
+                                # Sempre garantir que session_state está preenchido
+                                st.session_state["local_selecionado"] = selected_local
+                                st.session_state["data_selecionada"] = st.session_state.selected_date
                                 st.session_state.selected_date_local = f"{st.session_state.selected_date}_{selected_local}"
                                 st.session_state.show_multiple_pericias = False
                                 st.session_state.selected_date = None
@@ -1347,6 +1357,9 @@ def main():
                                         "criado_por": st.session_state.username,
                                         "criado_em": datetime.now().isoformat()
                                     }
+                                    # Sempre garantir que session_state está preenchido
+                                    st.session_state["local_selecionado"] = local_pericia
+                                    st.session_state["data_selecionada"] = st.session_state.selected_date
                                     st.success("✅ Perícia agendada com sucesso!")
                                     st.session_state.selected_date = None
                                     st.rerun()
