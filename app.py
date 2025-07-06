@@ -1,3 +1,9 @@
+# Função de normalização de chave para processos
+import unicodedata
+def normalize_key(data_iso, local_name):
+    local_normalized = unicodedata.normalize('NFKD', local_name).encode('ASCII', 'ignore').decode('utf-8')
+    local_normalized = local_normalized.replace(" ", "_").lower()
+    return f"{data_iso}_{local_normalized}"
 # -*- coding: utf-8 -*-
 import streamlit as st
 import pandas as pd
@@ -421,7 +427,7 @@ def show_processos_view(data_iso, local_name):
     st.markdown("---")
     
     # Chave para identificar os processos desta data/local
-    key_processos = f"{data_iso}_{local_name}"
+    key_processos = normalize_key(data_iso, local_name)
     
     # Inicializar lista de processos se não existir
     if key_processos not in st.session_state.processos:
@@ -465,6 +471,8 @@ def show_processos_view(data_iso, local_name):
                         situacao = st.selectbox("Situação", SITUACOES_PROCESSO)
                     
                     if st.form_submit_button("✅ Adicionar Processo do PDF"):
+                        # Recalcular key_processos usando a função de normalização
+                        key_processos = normalize_key(data_iso, local_name)
                         if numero_processo and nome_parte:
                             novo_processo = {
                                 "numero_processo": numero_processo,
