@@ -266,9 +266,6 @@ def show_local_specific_view(local_name):
                             st.session_state.data_selecionada = data
                             st.session_state.local_selecionado = local
                             st.session_state.selected_date_local = f"{data}_{local}"
-                            st.experimental_rerun()
-                        else:
-                            st.error("❌ Erro ao selecionar data/local. Tente novamente.")
                 with col2:
                     st.write(f"**Local:** {local_name}")
                 with col3:
