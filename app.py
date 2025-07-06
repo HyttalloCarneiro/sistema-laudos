@@ -257,15 +257,14 @@ def show_local_specific_view(local_name):
             for pericia in sorted(futuras, key=lambda x: x['Data_Sort']):
                 col1, col2, col3, col4 = st.columns([2, 3, 3, 2])
                 with col1:
-                    # Data clicável: ao clicar, define session_state.data_selecionada e local_selecionado
+                    # Data clicável: ao clicar, define apenas selected_date_local e faz rerun
                     data_formatada = pericia['Data']
                     data = pericia['Data_ISO']
                     local = local_name
                     if st.button(data_formatada, key=f"btn_{data}_{local}"):
                         if data and local:
-                            st.session_state.data_selecionada = data
-                            st.session_state.local_selecionado = local
                             st.session_state.selected_date_local = f"{data}_{local}"
+                            st.rerun()
                 with col2:
                     st.write(f"**Local:** {local_name}")
                 with col3:
