@@ -448,55 +448,10 @@ def show_processos_view(data_iso, local_name):
 
                 # Formulário para confirmar/editar dados extraídos
                 with st.form("add_processo_pdf"):
-                    st.markdown("#### Confirmar e Adicionar Processo")
-                    col1, col2 = st.columns(2)
-                    
-                    with col1:
-                        numero_processo = st.text_input("Número do Processo", value=extracted_info.get('numero_processo', ''))
-                        nome_parte = st.text_input("Nome da Parte", value=extracted_info.get('nome_parte', ''))
-                        horarios_validos = [datetime.time(h, m) for h in range(8, 17) for m in (0, 15, 30, 45)]
-                        horario = st.selectbox("Horário", horarios_validos, format_func=lambda t: t.strftime("%H:%M"))
-                    
-                    with col2:
-                        # Definir índice padrão baseado no tipo extraído
-                        tipo_extraido = extracted_info.get('tipo_pericia', 'Auxílio Doença (AD)')
-                        tipo_index = TIPOS_PERICIA.index(tipo_extraido) if tipo_extraido in TIPOS_PERICIA else 0
-                        
-                        tipo_pericia = st.selectbox("Tipo", TIPOS_PERICIA, index=tipo_index)
-                        situacao = st.selectbox("Situação", SITUACOES_PROCESSO)
-                    
+                    st.markdown("⚙️ Teste: Clique no botão abaixo para confirmar funcionamento do formulário.")
+                    # Botão de submit de teste
                     if st.form_submit_button("✅ Adicionar Processo do PDF"):
-                        if numero_processo and nome_parte:
-                            novo_processo = {
-                                "numero_processo": numero_processo,
-                                "nome_parte": nome_parte,
-                                "horario": horario.strftime("%H:%M"),
-                                "tipo": tipo_pericia,
-                                "situacao": situacao,
-                                "criado_por": st.session_state.username,
-                                "criado_em": datetime.now().isoformat(),
-                                "origem": "pdf"
-                            }
-                            # Verificar se já existe processo no mesmo horário
-                            horarios_existentes = [p['horario'] for p in st.session_state.processos[key_processos]]
-                            if novo_processo['horario'] in horarios_existentes:
-                                st.error(f"⚠️ Já existe um processo agendado para o horário {novo_processo['horario']}.")
-                                st.stop()
-                            # Adicionado: Mostrar conteúdo de novo_processo antes de adicionar
-                            st.markdown("### 📄 Conteúdo de `novo_processo`")
-                            st.write(novo_processo)
-                            st.session_state.processos[key_processos].append(novo_processo)
-                            st.success("✅ Processo do PDF adicionado com sucesso!")
-                            # st.rerun()  # Comentado temporariamente para debug
-                        else:
-                            st.error("❌ Número do processo e nome da parte são obrigatórios!")
-                        # DEBUG OUTPUTS
-                        st.markdown("### 🐞 DEBUG")
-                        st.write("🔑 key_processos:", key_processos)
-                        st.write("📄 novo_processo:", novo_processo)
-                # DEBUG: Exibir dados da sessão após tentativa de adicionar processo
-                st.markdown("### 🔍 Sessão atual de processos:")
-                st.write(st.session_state.processos)
+                        st.success("✅ Botão foi clicado com sucesso! O formulário está funcionando.")
             else:
                 st.warning("⚠️ Não foi possível extrair dados do PDF.")
 
