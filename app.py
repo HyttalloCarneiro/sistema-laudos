@@ -331,7 +331,12 @@ def show_processos_view(data_iso, local_name):
             with col1:
                 numero_processo = st.text_input("Número do Processo")
                 nome_parte = st.text_input("Nome da Parte")
-                horario = st.time_input("Horário", value=datetime.strptime("09:00", "%H:%M").time())
+                horario = st.time_input(
+                    "Horário",
+                    value=datetime.strptime("09:00", "%H:%M").time(),
+                    min_time=datetime.strptime("08:00", "%H:%M").time(),
+                    max_time=datetime.strptime("16:45", "%H:%M").time()
+                )
             
             with col2:
                 tipo_pericia = st.selectbox("Tipo", TIPOS_PERICIA)
@@ -402,7 +407,12 @@ def show_processos_view(data_iso, local_name):
                         with col1:
                             novo_numero = st.text_input("Número do Processo", value=processo_atual['numero_processo'])
                             novo_nome = st.text_input("Nome da Parte", value=processo_atual['nome_parte'])
-                            novo_horario = st.time_input("Horário", value=datetime.strptime(processo_atual['horario'], "%H:%M").time())
+                            novo_horario = st.time_input(
+                                "Horário",
+                                value=datetime.strptime(processo_atual['horario'], "%H:%M").time(),
+                                min_time=datetime.strptime("08:00", "%H:%M").time(),
+                                max_time=datetime.strptime("16:45", "%H:%M").time()
+                            )
                         
                         with col2:
                             novo_tipo = st.selectbox("Tipo", TIPOS_PERICIA, index=TIPOS_PERICIA.index(processo_atual['tipo']))
