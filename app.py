@@ -484,9 +484,13 @@ def show_processos_view(data_iso, local_name):
                                 st.stop()
                             st.session_state.processos[key_processos].append(novo_processo)
                             st.success("✅ Processo do PDF adicionado com sucesso!")
-                            st.rerun()
+                            # st.rerun()  # Comentado temporariamente para debug
                         else:
                             st.error("❌ Número do processo e nome da parte são obrigatórios!")
+                        # DEBUG OUTPUTS
+                        st.markdown("### 🐞 DEBUG")
+                        st.write("🔑 key_processos:", key_processos)
+                        st.write("📄 novo_processo:", novo_processo)
                 # DEBUG: Exibir dados da sessão após tentativa de adicionar processo
                 st.markdown("### 🔍 Sessão atual de processos:")
                 st.write(st.session_state.processos)
