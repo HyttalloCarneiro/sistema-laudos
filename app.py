@@ -471,7 +471,10 @@ def show_processos_view(data_iso, local_name):
                         if novo_processo['horario'] in horarios_existentes:
                             st.error(f"⚠️ Já existe um processo agendado para o horário {novo_processo['horario']}.")
                             st.stop()
-                        st.session_state.processos[key_processos].append(novo_processo)
+                        if key_processos in st.session_state.processos:
+                            st.session_state.processos[key_processos].append(novo_processo)
+                        else:
+                            st.session_state.processos[key_processos] = [novo_processo]
                         st.session_state["ultima_key_visualizada"] = key_processos
                         st.experimental_rerun()
             else:
@@ -509,9 +512,12 @@ def show_processos_view(data_iso, local_name):
                     if novo_processo['horario'] in horarios_existentes:
                         st.error(f"⚠️ Já existe um processo agendado para o horário {novo_processo['horario']}.")
                         st.stop()
-                    st.session_state.processos[key_processos].append(novo_processo)
-                    st.success("✅ Processo adicionado com sucesso!")
-                    st.rerun()
+                    if key_processos in st.session_state.processos:
+                        st.session_state.processos[key_processos].append(novo_processo)
+                    else:
+                        st.session_state.processos[key_processos] = [novo_processo]
+                    st.session_state["ultima_key_visualizada"] = key_processos
+                    st.experimental_rerun()
                 else:
                     st.error("❌ Número do processo e nome da parte são obrigatórios!")
     
