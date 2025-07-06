@@ -481,6 +481,9 @@ def show_processos_view(data_iso, local_name):
                             if novo_processo['horario'] in horarios_existentes:
                                 st.error(f"❌ Este horário já está ocupado: {novo_processo['horario']}. Escolha outro horário.")
                             else:
+                                # Adicionado: inicializar lista se não existir
+                                if key_processos not in st.session_state.processos:
+                                    st.session_state.processos[key_processos] = []
                                 st.session_state.processos[key_processos].append(novo_processo)
                                 st.success("✅ Processo do PDF adicionado com sucesso!")
                                 st.rerun()
