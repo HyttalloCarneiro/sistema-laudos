@@ -678,7 +678,7 @@ def main():
                 with col1:
                     current_password = st.text_input("Senha Atual", type="password")
                     new_password = st.text_input("Nova Senha", type="password")
-                :
+    
                     confirm_password = st.text_input("Confirmar Nova Senha", type="password")
                 
                 col1, col2 = st.columns(2)
