@@ -203,7 +203,7 @@ def create_calendar_view(year, month):
                             type="primary",
                             use_container_width=True
                         ):
-                            st.session_state.selected_date_local = f"{date_str}_{pericias_do_dia[0]}"
+                            st.session_state.selected_date_local = {"data": date_str, "local": pericias_do_dia[0]}
                             st.rerun()
                     else:
                         if cols[i].button(
@@ -271,7 +271,7 @@ def show_local_specific_view(local_name):
                 with col1:
                     # Data clicável
                     if st.button(f"📅 {pericia['Data']}", key=f"date_click_{pericia['Data_ISO']}_{local_name}"):
-                        st.session_state.selected_date_local = f"{pericia['Data_ISO']}_{local_name}"
+                        st.session_state.selected_date_local = {"data": pericia['Data_ISO'], "local": local_name}
                         st.rerun()
                 
                 with col2:
@@ -592,26 +592,10 @@ def main():
         
         # Verificar qual tela mostrar
         if st.session_state.selected_date_local:
-            # CORREÇÃO DO ERRO: Verificar se a string contém underscore antes de fazer split
-            try:
-                if '_' in st.session_state.selected_date_local:
-                    parts = st.session_state.selected_date_local.split('_')
-                    if len(parts) >= 2:
-                        data_iso = parts[0]
-                        local_name = '_'.join(parts[1:])  # Reconstroi o nome do local caso tenha underscores
-                        show_processos_view(data_iso, local_name)
-                    else:
-                        st.error("❌ Erro na identificação da data/local. Retornando ao calendário.")
-                        st.session_state.selected_date_local = None
-                        st.rerun()
-                else:
-                    st.error("❌ Formato inválido para data/local. Retornando ao calendário.")
-                    st.session_state.selected_date_local = None
-                    st.rerun()
-            except Exception as e:
-                st.error(f"❌ Erro ao processar data/local: {str(e)}")
-                st.session_state.selected_date_local = None
-                st.rerun()
+            if isinstance(st.session_state.selected_date_local, dict):
+                data_iso = st.session_state.selected_date_local["data"]
+                local_name = st.session_state.selected_date_local["local"]
+                show_processos_view(data_iso, local_name)
         
         elif st.session_state.show_estaduais_management and user_info['role'] == 'administrador':
             # Gerenciamento de locais estaduais
@@ -839,7 +823,7 @@ def main():
                     col1, col2 = st.columns(2)
                     with col1:
                         if st.button("✅ Confirmar Local"):
-                            st.session_state.selected_date_local = f"{date_str}_{local_escolhido}"
+                            st.session_state.selected_date_local = {"data": date_str, "local": local_escolhido}
                             st.session_state.selected_date_multilocais = None
                             st.rerun()
                     with col2:
