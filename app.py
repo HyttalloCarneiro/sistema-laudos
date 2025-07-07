@@ -322,6 +322,22 @@ def show_processos_view(data_iso, local_name):
         col_v1, col_v2 = st.columns(2)
         with col_v1:
             if st.button("✅ Confirmar Vinculação"):
+                # Atualiza pericias_por_dia corretamente para múltiplos locais
+                if data_iso not in st.session_state.pericias_por_dia:
+                    st.session_state.pericias_por_dia[data_iso] = [novo_local]
+                elif novo_local not in st.session_state.pericias_por_dia[data_iso]:
+                    st.session_state.pericias_por_dia[data_iso].append(novo_local)
+
+                # Criar a nova chave da perícia vinculada e adicioná-la
+                chave = f"{data_iso}_{novo_local}"
+                if chave not in st.session_state.pericias:
+                    st.session_state.pericias[chave] = {
+                        "local": novo_local,
+                        "observacoes": "",
+                        "criado_por": st.session_state.username,
+                        "criado_em": datetime.now().isoformat()
+                    }
+
                 st.session_state.selected_date_local = {"data": data_iso, "local": novo_local}
                 st.session_state.show_vincular_local = False
                 st.rerun()
