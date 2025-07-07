@@ -549,15 +549,14 @@ def show_processos_view(data_iso, local_name):
                         c.drawString(100, 660, f"Local: {local_name}")
                         c.save()
                         buffer.seek(0)
-                        # Download button apenas com ícone de download
+                        # Novo download_button usando buffer.getvalue() e label com ícone
                         st.download_button(
-                            label="",
-                            data=buffer,
+                            label="⬇️",
+                            data=buffer.getvalue(),
                             file_name=f"certidao_ausencia_{processo['numero_processo']}.pdf",
                             mime="application/pdf",
                             key=f"download_certidao_{processo_id}",
-                            help="Baixar Certidão de Ausência",
-                            icon="⬇️"
+                            help="Baixar Certidão de Ausência"
                         )
                     else:
                         ausente_clicked = st.button("", key=f"ausente_{processo_id}", icon="🚫")
