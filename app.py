@@ -568,6 +568,27 @@ def show_processos_view(data_iso, local_name):
         with col2:
             total_realizadas = len([p for p in processos_lista if p['situacao'] == 'Concluído'])
             st.metric("Total de Perícias Realizadas", total_realizadas)
+            # Botão de download de certidão de ausência, apenas se processo estiver ausente
+            for idx, processo in enumerate(processos_ordenados):
+                processo_id = idx
+                if processo['situacao'].lower() == 'ausente':
+                    from datetime import datetime
+                    data_convertida = datetime.strptime(data_iso, "%Y-%m-%d")
+                    buffer = gerar_certidao_ausencia(
+                        processo["numero_processo"],
+                        processo["nome_parte"],
+                        processo["tipo"],
+                        processo["horario"],
+                        data_convertida,
+                        local_name
+                    )
+                    st.download_button(
+                        label="📄 Baixar Certidão",
+                        data=buffer,
+                        file_name=f"certidao_ausencia_{processo['numero_processo']}.pdf",
+                        mime="application/pdf",
+                        key=f"download_certidao_{processo_id}"
+                    )
         with col3:
             total_ausentes = len([p for p in processos_lista if p['situacao'].lower() == 'ausente'])
             st.metric("Total de Ausentes", total_ausentes)
@@ -752,7 +773,7 @@ def main():
                 with col1:
                     current_password = st.text_input("Senha Atual", type="password")
                     new_password = st.text_input("Nova Senha", type="password")
-                with col2:
+                :
                     confirm_password = st.text_input("Confirmar Nova Senha", type="password")
                 
                 col1, col2 = st.columns(2)
@@ -795,7 +816,7 @@ def main():
                         new_role = st.selectbox("Perfil", ["assistente", "administrador"])
                     
                     # Configuração de permissões para assistentes
-                    if new_role == "assistente":
+                    if with col2new_role == "assistente":
                         st.markdown("#### 🔒 Configurar Permissões do Assistente")
                         st.markdown("*Configure quais funcionalidades este assistente poderá acessar:*")
                         
@@ -872,7 +893,7 @@ def main():
                             else:
                                 st.write("• Nenhuma permissão ativa")
                     
-                    with col2:
+                    :
                         if username != st.session_state.username:
                             if st.button("🗑️ Remover", key=f"del_{username}", type="secondary"):
                                 del st.session_state.users[username]
@@ -888,7 +909,7 @@ def main():
             show_local_specific_view(st.session_state.current_local_filter)
         
         else:
-            # Interface principal - calendário
+            # Interface principal - calendáriowith col2
             tab1, tab2 = st.tabs(["📅 Calendário e Perícias", "📋 Gerenciar Perícias"])
             
             with tab1:
