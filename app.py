@@ -303,12 +303,33 @@ def show_processos_view(data_iso, local_name):
     data_br = format_date_br(data_iso)
     st.markdown(f"## 📋 Processos - {data_br}")
     st.markdown(f"**Local:** {local_name}")
-    
-    # Botão para voltar
-    if st.button("← Voltar para " + local_name):
-        st.session_state.selected_date_local = None
-        st.rerun()
-    
+
+    # Bloco: botões para voltar e vincular outro local
+    col1, col2 = st.columns([2, 2])
+    with col1:
+        if st.button(f"← Voltar para {local_name}"):
+            st.session_state.selected_date_local = None
+            st.rerun()
+    with col2:
+        if st.button("🔗 Vincular outro local nesta data"):
+            st.session_state.show_vincular_local = True
+
+    # Formulário de vinculação de local em data
+    if st.session_state.get("show_vincular_local", False):
+        st.markdown("#### 🔗 Escolher outro local para vincular nesta data")
+        locais_disponiveis = [loc for loc in get_all_locais() if loc != local_name]
+        novo_local = st.selectbox("Selecione o local", locais_disponiveis, key="select_novo_local")
+        col_v1, col_v2 = st.columns(2)
+        with col_v1:
+            if st.button("✅ Confirmar Vinculação"):
+                st.session_state.selected_date_local = {"data": data_iso, "local": novo_local}
+                st.session_state.show_vincular_local = False
+                st.rerun()
+        with col_v2:
+            if st.button("❌ Cancelar"):
+                st.session_state.show_vincular_local = False
+                st.rerun()
+
     st.markdown("---")
     
     # Chave para identificar os processos desta data/local
