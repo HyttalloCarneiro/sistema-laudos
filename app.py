@@ -397,77 +397,52 @@ def show_processos_view(data_iso, local_name):
         # Ordenar por horário
         processos_ordenados = sorted(processos_lista, key=lambda x: x['horario'])
 
-        # Exibir manualmente em colunas: Anexar Processo, Horário, Número do Processo, Nome da parte, Situação, Excluir
-        header_cols = st.columns([2, 2, 3, 3, 2, 1])
-        header_cols[0].markdown("**Anexar Processo**")
-        header_cols[1].markdown("**Horário**")
-        header_cols[2].markdown("**Número do Processo**")
-        header_cols[3].markdown("**Nome da parte**")
-        header_cols[4].markdown("**Situação**")
-        header_cols[5].markdown("**Excluir**")
+        # Novo cabeçalho de colunas
+        colunas = ["Anexar Processo", "Horário", "Número do Processo", "Nome da parte", "Situação", "Ação"]
+        header_cols = st.columns([2, 2, 3, 3, 2, 2])
+        for i, nome_col in enumerate(colunas):
+            header_cols[i].markdown(f"**{nome_col}**")
 
         for idx, processo in enumerate(processos_ordenados):
-            row_cols = st.columns([2, 2, 3, 3, 2, 1])
+            row_cols = st.columns([2, 2, 3, 3, 2, 2])
             # Anexar Processo - file_uploader (em breve)
             with row_cols[0]:
-                #st.file_uploader("Anexar PDF", key=f"file_{key_processos}_{idx}", accept_multiple_files=False, type="pdf")
                 st.button("📎 Em breve", key=f"anexar_{key_processos}_{idx}", disabled=True)
             row_cols[1].write(processo['horario'])
             row_cols[2].write(processo['numero_processo'])
             row_cols[3].write(processo['nome_parte'])
             row_cols[4].write(processo['situacao'])
-            # Botão "Ausente" com dupla confirmação
-            with row_cols[4]:
-                if processo['situacao'].lower() != 'ausente':
-                    # Checar se st.confirm está disponível (Streamlit >= 1.31)
-                    if hasattr(st, "confirm"):
-                        if st.button("🚫 Marcar Ausente", key=f"ausente_{key_processos}_{idx}"):
-                            if st.confirm(f"Deseja realmente marcar o processo de {processo['nome_parte']} como AUSENTE?"):
-                                for i, p in enumerate(st.session_state.processos[key_processos]):
-                                    if (
-                                        p['numero_processo'] == processo['numero_processo']
-                                        and p['nome_parte'] == processo['nome_parte']
-                                        and p['horario'] == processo['horario']
-                                    ):
-                                        st.session_state.processos[key_processos][i]['situacao'] = 'Ausente'
-                                        st.success("🚫 Processo marcado como ausente.")
-                                        st.rerun()
-                    else:
-                        # Simulação de dupla confirmação usando session_state
-                        confirm_key = f"confirm_ausente_{key_processos}_{idx}"
-                        if st.button("🚫 Marcar Ausente", key=f"ausente_{key_processos}_{idx}"):
-                            st.session_state[confirm_key] = True
-                            st.experimental_rerun()
-                        if st.session_state.get(confirm_key, False):
-                            if st.warning(f"Deseja realmente marcar o processo de {processo['nome_parte']} como AUSENTE?"):
-                                col_c1, col_c2 = st.columns(2)
-                                with col_c1:
-                                    if st.button("✅ Sim", key=f"confirm_sim_{key_processos}_{idx}"):
-                                        for i, p in enumerate(st.session_state.processos[key_processos]):
-                                            if (
-                                                p['numero_processo'] == processo['numero_processo']
-                                                and p['nome_parte'] == processo['nome_parte']
-                                                and p['horario'] == processo['horario']
-                                            ):
-                                                st.session_state.processos[key_processos][i]['situacao'] = 'Ausente'
-                                                st.success("🚫 Processo marcado como ausente.")
-                                                st.session_state[confirm_key] = False
-                                                st.rerun()
-                                with col_c2:
-                                    if st.button("❌ Não", key=f"confirm_nao_{key_processos}_{idx}"):
-                                        st.session_state[confirm_key] = False
-                                        st.experimental_rerun()
+            # Coluna de ações
             with row_cols[5]:
-                if st.button("🗑️", key=f"del_proc_{key_processos}_{idx}"):
-                    # Remover processo da lista
-                    st.session_state.processos[key_processos] = [
-                        p for p in st.session_state.processos[key_processos]
-                        if not (p['numero_processo'] == processo['numero_processo'] and
-                                p['nome_parte'] == processo['nome_parte'] and
-                                p['horario'] == processo['horario'])
-                    ]
-                    st.success("✅ Processo excluído com sucesso!")
-                    st.rerun()
+                # Botão para redigir laudo (em breve)
+                st.button("📝 Laudo", key=f"laudo_{key_processos}_{idx}", disabled=True)
+
+                # Botão para marcar Ausente com dupla confirmação
+                if processo['situacao'].lower() != 'ausente':
+                    if st.button("🚫 Ausente", key=f"ausente_{key_processos}_{idx}"):
+                        if st.session_state.get(f"confirm_ausente_{key_processos}_{idx}", False):
+                            for i, p in enumerate(st.session_state.processos[key_processos]):
+                                if (
+                                    p['numero_processo'] == processo['numero_processo']
+                                    and p['nome_parte'] == processo['nome_parte']
+                                    and p['horario'] == processo['horario']
+                                ):
+                                    st.session_state.processos[key_processos][i]['situacao'] = 'Ausente'
+                                    st.success("🚫 Processo marcado como ausente.")
+                                    st.experimental_rerun()
+                        else:
+                            st.session_state[f"confirm_ausente_{key_processos}_{idx}"] = True
+                            st.warning("Clique novamente para confirmar ausência!")
+
+                # Botão para excluir processo com dupla confirmação
+                if st.button("🗑️ Excluir", key=f"excluir_{key_processos}_{idx}"):
+                    if st.session_state.get(f"confirm_excluir_{key_processos}_{idx}", False):
+                        st.session_state.processos[key_processos].pop(idx)
+                        st.success("🗑️ Processo excluído com sucesso.")
+                        st.experimental_rerun()
+                    else:
+                        st.session_state[f"confirm_excluir_{key_processos}_{idx}"] = True
+                        st.warning("Clique novamente para confirmar exclusão!")
 
         # Opções de edição (mantido se necessário)
         if has_permission(st.session_state.user_info, 'editar_pericias'):
