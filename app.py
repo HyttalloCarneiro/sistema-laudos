@@ -304,13 +304,18 @@ def show_local_specific_view(local_name):
     mes_seguinte = (mes_atual % 12) + 1
     ano_seguinte = ano_atual + 1 if mes_seguinte == 1 else ano_atual
 
-    datas_mes = set()
+    dias_mes_atual = set()
+    dias_mes_seguinte = set()
+
     for p in pericias_local:
         data_obj = datetime.strptime(p['Data_Sort'], "%Y-%m-%d").date()
-        if (data_obj.month == mes_atual and data_obj.year == ano_atual) or (data_obj.month == mes_seguinte and data_obj.year == ano_seguinte):
-            datas_mes.add(data_obj)
+        if data_obj.month == mes_atual and data_obj.year == ano_atual:
+            dias_mes_atual.add(data_obj)
+        elif data_obj.month == mes_seguinte and data_obj.year == ano_seguinte:
+            dias_mes_seguinte.add(data_obj)
 
-    st.metric("Dias com Perícias (Mês Atual + Seguinte)", len(datas_mes))
+    st.metric("Dias com Perícias - Mês Atual", len(dias_mes_atual))
+    st.metric("Dias com Perícias - Mês Seguinte", len(dias_mes_seguinte))
 
 def show_processos_view(data_iso, local_name):
     """Mostra a tela de gerenciamento de processos para uma data/local específico"""
@@ -411,6 +416,47 @@ def show_processos_view(data_iso, local_name):
             row_cols[2].write(processo['numero_processo'])
             row_cols[3].write(processo['nome_parte'])
             row_cols[4].write(processo['situacao'])
+            # Botão "Ausente" com dupla confirmação
+            with row_cols[4]:
+                if processo['situacao'].lower() != 'ausente':
+                    # Checar se st.confirm está disponível (Streamlit >= 1.31)
+                    if hasattr(st, "confirm"):
+                        if st.button("🚫 Marcar Ausente", key=f"ausente_{key_processos}_{idx}"):
+                            if st.confirm(f"Deseja realmente marcar o processo de {processo['nome_parte']} como AUSENTE?"):
+                                for i, p in enumerate(st.session_state.processos[key_processos]):
+                                    if (
+                                        p['numero_processo'] == processo['numero_processo']
+                                        and p['nome_parte'] == processo['nome_parte']
+                                        and p['horario'] == processo['horario']
+                                    ):
+                                        st.session_state.processos[key_processos][i]['situacao'] = 'Ausente'
+                                        st.success("🚫 Processo marcado como ausente.")
+                                        st.rerun()
+                    else:
+                        # Simulação de dupla confirmação usando session_state
+                        confirm_key = f"confirm_ausente_{key_processos}_{idx}"
+                        if st.button("🚫 Marcar Ausente", key=f"ausente_{key_processos}_{idx}"):
+                            st.session_state[confirm_key] = True
+                            st.experimental_rerun()
+                        if st.session_state.get(confirm_key, False):
+                            if st.warning(f"Deseja realmente marcar o processo de {processo['nome_parte']} como AUSENTE?"):
+                                col_c1, col_c2 = st.columns(2)
+                                with col_c1:
+                                    if st.button("✅ Sim", key=f"confirm_sim_{key_processos}_{idx}"):
+                                        for i, p in enumerate(st.session_state.processos[key_processos]):
+                                            if (
+                                                p['numero_processo'] == processo['numero_processo']
+                                                and p['nome_parte'] == processo['nome_parte']
+                                                and p['horario'] == processo['horario']
+                                            ):
+                                                st.session_state.processos[key_processos][i]['situacao'] = 'Ausente'
+                                                st.success("🚫 Processo marcado como ausente.")
+                                                st.session_state[confirm_key] = False
+                                                st.rerun()
+                                with col_c2:
+                                    if st.button("❌ Não", key=f"confirm_nao_{key_processos}_{idx}"):
+                                        st.session_state[confirm_key] = False
+                                        st.experimental_rerun()
             with row_cols[5]:
                 if st.button("🗑️", key=f"del_proc_{key_processos}_{idx}"):
                     # Remover processo da lista
@@ -478,7 +524,8 @@ def show_processos_view(data_iso, local_name):
             total_realizadas = len([p for p in processos_lista if p['situacao'] == 'Concluído'])
             st.metric("Total de Perícias Realizadas", total_realizadas)
         with col3:
-            st.metric("Total de Ausentes", 0)
+            total_ausentes = len([p for p in processos_lista if p['situacao'].lower() == 'ausente'])
+            st.metric("Total de Ausentes", total_ausentes)
 
     else:
         st.info("📭 Nenhum processo cadastrado para esta data/local ainda.")
@@ -875,10 +922,11 @@ def main():
                         col1, col2 = st.columns(2)
                         with col1:
                             if st.form_submit_button("✅ Confirmar Perícia", type="primary"):
-                                # Criar chave única para cada perícia
-                                chave_pericia = f"{st.session_state.selected_date}_{local_pericia}"
-                                if chave_pericia not in st.session_state.pericias:
-                                    st.session_state.pericias[chave_pericia] = {
+                                # Criar chave composta de data + local (permite múltiplas perícias no mesmo dia)
+                                chave_base = st.session_state.selected_date
+                                chave_completa = f"{chave_base}_{local_pericia}"
+                                if chave_completa not in st.session_state.pericias:
+                                    st.session_state.pericias[chave_completa] = {
                                         "local": local_pericia,
                                         "observacoes": observacoes,
                                         "criado_por": st.session_state.username,
@@ -886,7 +934,7 @@ def main():
                                     }
                                     st.success("✅ Perícia agendada com sucesso!")
                                 else:
-                                    st.warning("⚠️ Perícia já agendada neste local e data.")
+                                    st.warning("⚠️ Já há perícia agendada neste local e data.")
                                 st.session_state.selected_date = None
                                 st.rerun()
                         with col2:
