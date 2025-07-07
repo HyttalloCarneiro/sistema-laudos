@@ -455,13 +455,16 @@ def show_processos_view(data_iso, local_name):
         c.drawString(100, 660, f"Local: {local_name}")
         c.save()
         buffer.seek(0)
-        b64 = base64.b64encode(buffer.read()).decode()
-        href = f'<a href="data:application/pdf;base64,{b64}" download="certidao_ausencia_{processo["numero_processo"]}.pdf">📄 Baixar Certidão</a>'
-        st.markdown(href, unsafe_allow_html=True)
-        st.session_state["certidao_ausencia_pdf"] = href
+        st.download_button(
+            label="📄 Baixar Certidão",
+            data=buffer.getvalue(),
+            file_name=f"certidao_ausencia_{processo['numero_processo']}.pdf",
+            mime="application/pdf",
+            key=f"certidao_ausente_{processo_id}"
+        )
         st.session_state["processo_acao_flag"] = None
         st.session_state["processo_acao_tipo"] = None
-        st.rerun()
+        # st.rerun()
 
     def realizar_acao_confirmada(processo_id):
         acao = st.session_state.get("processo_acao_tipo")
