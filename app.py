@@ -382,19 +382,27 @@ def show_processos_view(data_iso, local_name):
 
     # Formulário para adicionar novo processo
     with st.expander("➕ Adicionar Novo Processo"):
-        with st.form("add_processo"):
-            col1, col2 = st.columns(2)
-            with col1:
-                numero_processo = st.text_input("Número do Processo")
-                nome_parte = st.text_input("Nome da Parte")
+    from datetime import datetime
+    with st.form("add_processo"):
+        col1, col2 = st.columns(2)
+        with col1:
+            numero_processo = st.text_input("Número do Processo")
+            nome_parte = st.text_input("Nome da Parte")
+            try:
                 horario = st.time_input(
                     "Horário",
                     value=datetime.strptime("09:00", "%H:%M").time(),
                     step=900
                 )
-            with col2:
-                tipo_pericia = st.selectbox("Tipo", TIPOS_PERICIA)
-                situacao = st.selectbox("Situação", SITUACOES_PROCESSO)
+            except UnboundLocalError:
+                horario = st.time_input(
+                    "Horário",
+                    value=datetime.now().time(),
+                    step=900
+                )
+        with col2:
+            tipo_pericia = st.selectbox("Tipo", TIPOS_PERICIA)
+            situacao = st.selectbox("Situação", SITUACOES_PROCESSO)
 
             # Verificação do intervalo permitido para o horário
             hora_min = datetime.strptime("08:00", "%H:%M").time()
