@@ -472,6 +472,27 @@ def show_processos_view(data_iso, local_name):
         # Limpa botão de certidão após ação
         st.session_state["certidao_ausencia_pdf"] = None
 
+    # Função para exibir sigla do tipo de processo
+    def tipo_sigla(tipo):
+        tipo = tipo or ""
+        tipo = tipo.strip()
+        # Mapeamento conforme solicitado
+        if tipo.lower().startswith("auxílio doença"):
+            return "AD"
+        elif tipo.lower().startswith("bpc") or "loas" in tipo.lower():
+            return "BPC"
+        elif "dpvat" in tipo.upper():
+            return "DPVAT"
+        elif "medicação" in tipo.lower() or "perícia médica" in tipo.lower() or tipo.lower().startswith("perícia médica") or tipo.strip().upper() == "MED":
+            return "MED"
+        else:
+            # fallback: usar maiúsculas da sigla se for entre parênteses
+            import re
+            m = re.search(r"\(([A-Z]+)\)", tipo)
+            if m:
+                return m.group(1)
+            return tipo
+
     if processos_lista:
         st.markdown("### 📋 Processos Cadastrados")
         # Ordenar por horário
@@ -504,8 +525,8 @@ def show_processos_view(data_iso, local_name):
             row_cols[1].write(processo['horario'])
             row_cols[2].write(processo['numero_processo'])
             row_cols[3].write(processo['nome_parte'])
-            # Nova coluna "Tipo"
-            row_cols[4].write(processo.get('tipo', ''))
+            # Exibir apenas a sigla do tipo
+            row_cols[4].write(tipo_sigla(processo.get('tipo', '')))
             row_cols[5].write(processo['situacao'])
             # Botões de ação lado a lado, largura igual, sem texto verticalizado
             with row_cols[6]:
@@ -516,7 +537,7 @@ def show_processos_view(data_iso, local_name):
                 # Ausente/Certidão de Ausência
                 with action_cols[1]:
                     if processo['situacao'].lower() == 'ausente':
-                        # Gerar PDF para download diretamente
+                        # Gera PDF e download_button com ícone padrão
                         buffer = BytesIO()
                         c = canvas.Canvas(buffer)
                         c.setFont("Helvetica-Bold", 16)
@@ -528,12 +549,15 @@ def show_processos_view(data_iso, local_name):
                         c.drawString(100, 660, f"Local: {local_name}")
                         c.save()
                         buffer.seek(0)
+                        # Download button apenas com ícone de download
                         st.download_button(
-                            label="📄 Baixar Certidão",
+                            label="",
                             data=buffer,
                             file_name=f"certidao_ausencia_{processo['numero_processo']}.pdf",
                             mime="application/pdf",
-                            key=f"download_certidao_{processo_id}"
+                            key=f"download_certidao_{processo_id}",
+                            help="Baixar Certidão de Ausência",
+                            icon="⬇️"
                         )
                     else:
                         ausente_clicked = st.button("", key=f"ausente_{processo_id}", icon="🚫")
