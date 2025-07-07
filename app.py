@@ -334,7 +334,8 @@ def show_processos_view(data_iso, local_name):
                 nome_parte = st.text_input("Nome da Parte")
                 horario = st.time_input(
                     "Horário",
-                    value=datetime.strptime("09:00", "%H:%M").time()
+                    value=datetime.strptime("09:00", "%H:%M").time(),
+                    step=900
                 )
 
             with col2:
