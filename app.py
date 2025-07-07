@@ -108,6 +108,8 @@ def init_session_data():
     
     if 'pericias' not in st.session_state:
         st.session_state.pericias = {}
+    if 'pericias_por_dia' not in st.session_state:
+        st.session_state.pericias_por_dia = {}
     
     if 'processos' not in st.session_state:
         st.session_state.processos = {}
@@ -182,15 +184,7 @@ def create_calendar_view(year, month):
                 date_str = f"{year}-{month:02d}-{day:02d}"
 
                 # Verificar se há perícias neste dia
-                pericias_do_dia = []
-                for chave, info in st.session_state.pericias.items():
-                    if '_' in chave:
-                        data_chave = chave.split('_')[0]
-                    else:
-                        data_chave = chave
-
-                    if data_chave == date_str:
-                        pericias_do_dia.append(info['local'])
+                pericias_do_dia = st.session_state.pericias_por_dia.get(date_str, [])
 
                 if pericias_do_dia:
                     num_pericias = len(pericias_do_dia)
@@ -933,6 +927,13 @@ def main():
                                         "criado_por": st.session_state.username,
                                         "criado_em": datetime.now().isoformat()
                                     }
+
+                                    # Atualizar pericias_por_dia
+                                    if st.session_state.selected_date not in st.session_state.pericias_por_dia:
+                                        st.session_state.pericias_por_dia[st.session_state.selected_date] = []
+                                    if local_pericia not in st.session_state.pericias_por_dia[st.session_state.selected_date]:
+                                        st.session_state.pericias_por_dia[st.session_state.selected_date].append(local_pericia)
+
                                     st.success("✅ Perícia agendada com sucesso!")
                                     st.session_state.selected_date = None
                                     st.rerun()
