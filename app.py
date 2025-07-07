@@ -380,61 +380,9 @@ def show_processos_view(data_iso, local_name):
         st.session_state.processos[key_processos] = []
 
     # Formulário para adicionar novo processo
-    with st.expander("➕ Adicionar Novo Processo"):
-    from datetime import datetime
-    with st.form("add_processo"):
-        col1, col2 = st.columns(2)
-        with col1:
-            numero_processo = st.text_input("Número do Processo")
-            nome_parte = st.text_input("Nome da Parte")
-            try:
-                horario = st.time_input(
-                    "Horário",
-                    value=datetime.strptime("09:00", "%H:%M").time(),
-                    step=900
-                )
-            except UnboundLocalError:
-                horario = st.time_input(
-                    "Horário",
-                    value=datetime.now().time(),
-                    step=900
-                )
-        with col2:
-            tipo_pericia = st.selectbox("Tipo", TIPOS_PERICIA)
-            situacao = st.selectbox("Situação", SITUACOES_PROCESSO)
-
-            # Verificação do intervalo permitido para o horário
-            hora_min = datetime.strptime("08:00", "%H:%M").time()
-            hora_max = datetime.strptime("16:45", "%H:%M").time()
-
-            if horario < hora_min or horario > hora_max:
-                st.error("❌ O horário deve estar entre 08:00 e 16:45.")
-
-            if st.form_submit_button("✅ Adicionar Processo"):
-                if numero_processo and nome_parte:
-                    # Verificar se já existe processo com o mesmo horário nesta data/local
-                    existe_horario = any(
-                        p['horario'] == horario.strftime("%H:%M") for p in st.session_state.processos[key_processos]
-                    )
-                    if existe_horario:
-                        st.error("❌ Já existe um processo cadastrado neste horário!")
-                    elif horario < hora_min or horario > hora_max:
-                        st.error("❌ O horário deve estar entre 08:00 e 16:45.")
-                    else:
-                        novo_processo = {
-                            "numero_processo": numero_processo,
-                            "nome_parte": nome_parte,
-                            "horario": horario.strftime("%H:%M"),
-                            "tipo": tipo_pericia,
-                            "situacao": situacao,
-                            "criado_por": st.session_state.username,
-                            "criado_em": datetime.now().isoformat()
-                        }
-                        st.session_state.processos[key_processos].append(novo_processo)
-                        st.success("✅ Processo adicionado com sucesso!")
-                        st.rerun()
-                else:
-                    st.error("❌ Número do processo e nome da parte são obrigatórios!")
+    with col2:
+        st.session_state.confirmar_ausencia = index
+        st.experimental_rerun()
 
     # Listar processos existentes
     processos_lista = st.session_state.processos.get(key_processos, [])
