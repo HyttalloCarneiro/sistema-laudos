@@ -334,14 +334,19 @@ def show_processos_view(data_iso, local_name):
                 nome_parte = st.text_input("Nome da Parte")
                 horario = st.time_input(
                     "Horário",
-                    value=datetime.strptime("09:00", "%H:%M").time(),
-                    min_value=datetime.strptime("08:00", "%H:%M").time(),
-                    max_value=datetime.strptime("16:45", "%H:%M").time()
+                    value=datetime.strptime("09:00", "%H:%M").time()
                 )
 
             with col2:
                 tipo_pericia = st.selectbox("Tipo", TIPOS_PERICIA)
                 situacao = st.selectbox("Situação", SITUACOES_PROCESSO)
+
+            # Verificação do intervalo permitido para o horário
+            hora_min = datetime.strptime("08:00", "%H:%M").time()
+            hora_max = datetime.strptime("16:45", "%H:%M").time()
+
+            if horario < hora_min or horario > hora_max:
+                st.error("❌ O horário deve estar entre 08:00 e 16:45.")
 
             if st.form_submit_button("✅ Adicionar Processo"):
                 if numero_processo and nome_parte:
@@ -351,6 +356,8 @@ def show_processos_view(data_iso, local_name):
                     )
                     if existe_horario:
                         st.error("❌ Já existe um processo cadastrado neste horário!")
+                    elif horario < hora_min or horario > hora_max:
+                        st.error("❌ O horário deve estar entre 08:00 e 16:45.")
                     else:
                         novo_processo = {
                             "numero_processo": numero_processo,
