@@ -485,10 +485,10 @@ def show_processos_view(data_iso, local_name):
                 st.warning("Tem certeza desta ação?")
                 col1, col2 = st.columns([1, 1])
                 with col1:
-                    if st.button("Sim", key=f"confirmar_sim_{processo_id}"):
+                    if st.button("Sim", key=f"sim_{processo_id}"):
                         realizar_acao_confirmada(processo_id)
                 with col2:
-                    if st.button("Não", key=f"confirmar_nao_{processo_id}"):
+                    if st.button("Não", key=f"nao_{processo_id}"):
                         st.session_state["confirmar_acao"] = None
                         st.session_state["acao_desejada"] = None
                 # Não exibe o restante da linha se está exibindo confirmação
@@ -501,16 +501,20 @@ def show_processos_view(data_iso, local_name):
             row_cols[2].write(processo['numero_processo'])
             row_cols[3].write(processo['nome_parte'])
             row_cols[4].write(processo['situacao'])
+            # Botões de ação lado a lado, largura igual, sem texto verticalizado
             with row_cols[5]:
-                col_laudo, col_ausente, col_excluir = st.columns([1, 1, 1], gap="small")
-                with col_laudo:
+                action_cols = st.columns(3)
+                # Redigir Laudo (desabilitado)
+                with action_cols[0]:
                     st.button("Redigir Laudo", key=f"laudo_{key_processos}_{idx}", disabled=True)
-                with col_ausente:
+                # Ausente
+                with action_cols[1]:
                     if processo['situacao'].lower() != 'ausente':
                         if st.button("Ausente", key=f"ausente_{processo_id}"):
                             st.session_state["confirmar_acao"] = processo_id
                             st.session_state["acao_desejada"] = "ausente"
-                with col_excluir:
+                # Excluir
+                with action_cols[2]:
                     if st.button("Excluir", key=f"excluir_{processo_id}"):
                         st.session_state["confirmar_acao"] = processo_id
                         st.session_state["acao_desejada"] = "excluir"
