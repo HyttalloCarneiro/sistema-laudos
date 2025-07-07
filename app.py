@@ -4,6 +4,7 @@ import calendar
 from datetime import datetime, date
 import json
 import locale
+from fpdf import FPDF
 
 # Configuração da página
 st.set_page_config(
@@ -419,28 +420,49 @@ def show_processos_view(data_iso, local_name):
                 with col_laudo:
                     st.button("📝", key=f"laudo_{key_processos}_{idx}", disabled=True)
                 with col_ausente:
+                    # NOVA LÓGICA MODAL AUSENTE
                     if processo['situacao'].lower() != 'ausente':
-                        if st.session_state.get(f"confirm_ausente_{key_processos}_{idx}", False):
-                            if st.button("🚫", key=f"confirmar_ausente_{key_processos}_{idx}", type="secondary"):
-                                st.session_state.processos[key_processos][idx]['situacao'] = 'Ausente'
-                                st.success("🚫 Processo marcado como ausente.")
-                                del st.session_state[f"confirm_ausente_{key_processos}_{idx}"]
-                                st.rerun()
-                        else:
-                            if st.button("🚫", key=f"ausente_{key_processos}_{idx}"):
-                                st.session_state[f"confirm_ausente_{key_processos}_{idx}"] = True
-                                st.warning("Tem certeza que deseja marcar como ausente?")
+                        if st.button("🚫", key=f"ausente_{key_processos}_{idx}"):
+                            st.session_state[f"show_modal_ausente_{key_processos}_{idx}"] = True
+                        if st.session_state.get(f"show_modal_ausente_{key_processos}_{idx}", False):
+                            with st.modal("Tem certeza desta ação?"):
+                                st.write("Deseja marcar o processo como **ausente**?")
+                                col_sim, col_nao = st.columns(2)
+                                with col_sim:
+                                    if st.button("✅ Sim", key=f"confirma_ausente_{key_processos}_{idx}"):
+                                        st.session_state.processos[key_processos][idx]['situacao'] = 'Ausente'
+                                        from fpdf import FPDF
+                                        pdf = FPDF()
+                                        pdf.add_page()
+                                        pdf.set_font("Arial", size=12)
+                                        cert_text = f"Certifico que o(a) periciando(a) {processo['nome_parte']}, referente ao processo {processo['numero_processo']}, não compareceu à perícia agendada para o dia {format_date_br(data_iso)}, às {processo['horario']}, no local {local_name}."
+                                        pdf.multi_cell(0, 10, cert_text)
+                                        pdf_output = pdf.output(dest='S').encode('latin-1')
+                                        st.download_button("📄 Baixar Certidão de Ausência", data=pdf_output, file_name=f"certidao_ausencia_{processo['numero_processo']}.pdf", mime="application/pdf")
+                                        st.session_state[f"show_modal_ausente_{key_processos}_{idx}"] = False
+                                        st.rerun()
+                                with col_nao:
+                                    if st.button("❌ Não", key=f"cancela_ausente_{key_processos}_{idx}"):
+                                        st.session_state[f"show_modal_ausente_{key_processos}_{idx}"] = False
+                                        st.rerun()
                 with col_excluir:
-                    if st.session_state.get(f"confirm_excluir_{key_processos}_{idx}", False):
-                        if st.button("🗑️", key=f"confirmar_excluir_{key_processos}_{idx}", type="secondary"):
-                            st.session_state.processos[key_processos].pop(idx)
-                            st.success("🗑️ Processo excluído com sucesso.")
-                            del st.session_state[f"confirm_excluir_{key_processos}_{idx}"]
-                            st.rerun()
-                    else:
-                        if st.button("🗑️", key=f"excluir_{key_processos}_{idx}"):
-                            st.session_state[f"confirm_excluir_{key_processos}_{idx}"] = True
-                            st.warning("Tem certeza que deseja excluir?")
+                    # NOVA LÓGICA MODAL EXCLUIR
+                    if st.button("🗑️", key=f"excluir_{key_processos}_{idx}"):
+                        st.session_state[f"show_modal_excluir_{key_processos}_{idx}"] = True
+                    if st.session_state.get(f"show_modal_excluir_{key_processos}_{idx}", False):
+                        with st.modal("Tem certeza desta ação?"):
+                            st.write("Deseja realmente excluir este processo?")
+                            col_sim, col_nao = st.columns(2)
+                            with col_sim:
+                                if st.button("✅ Sim", key=f"confirma_excluir_{key_processos}_{idx}"):
+                                    st.session_state.processos[key_processos].pop(idx)
+                                    st.session_state[f"show_modal_excluir_{key_processos}_{idx}"] = False
+                                    st.success("🗑️ Processo excluído com sucesso.")
+                                    st.rerun()
+                            with col_nao:
+                                if st.button("❌ Não", key=f"cancela_excluir_{key_processos}_{idx}"):
+                                    st.session_state[f"show_modal_excluir_{key_processos}_{idx}"] = False
+                                    st.rerun()
 
         # Estatísticas dos processos (ajustado)
         st.markdown("### 📊 Estatísticas dos Processos")
@@ -841,10 +863,13 @@ def main():
                     
                     if pericias_existentes:
                         st.info(f"📍 Já há perícias agendadas nesta data em: {', '.join(pericias_existentes)}")
+
+                    st.markdown("#### ➕ Cadastrar nova perícia em outro local")
+                    st.markdown("*Mesmo dia, local diferente:*")
                     
                     with st.form("add_pericia"):
                         # Apenas local e observações, sem horário
-                        local_pericia = st.selectbox("Local da Perícia", get_all_locais())
+                        local_pericia = st.selectbox("Escolha outro local da perícia", get_all_locais())
                         observacoes = st.text_area("Observações (opcional)")
                         
                         col1, col2 = st.columns(2)
