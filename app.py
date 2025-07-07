@@ -4,8 +4,6 @@ import calendar
 from datetime import datetime, date
 import json
 import locale
-import base64
-from io import BytesIO
 
 # Configuração da página
 st.set_page_config(
@@ -300,187 +298,167 @@ def show_local_specific_view(local_name):
     
     # Estatísticas do local
     st.markdown("### 📊 Estatísticas")
-    hoje = datetime.now().date()
-    mes_atual = hoje.month
-    ano_atual = hoje.year
-    mes_seguinte = (mes_atual % 12) + 1
-    ano_seguinte = ano_atual + 1 if mes_seguinte == 1 else ano_atual
-
-    dias_mes_atual = set()
-    dias_mes_seguinte = set()
-
+    # Novo: mostrar apenas "Total de Dias com Perícias"
+    datas_unicas = set()
     for p in pericias_local:
-        data_obj = datetime.strptime(p['Data_Sort'], "%Y-%m-%d").date()
-        if data_obj.month == mes_atual and data_obj.year == ano_atual:
-            dias_mes_atual.add(data_obj)
-        elif data_obj.month == mes_seguinte and data_obj.year == ano_seguinte:
-            dias_mes_seguinte.add(data_obj)
-
-    st.metric("Dias com Perícias - Mês Atual", len(dias_mes_atual))
-    st.metric("Dias com Perícias - Mês Seguinte", len(dias_mes_seguinte))
+        datas_unicas.add(p['Data_Sort'])
+    st.metric("Total de Dias com Perícias", len(datas_unicas))
 
 def show_processos_view(data_iso, local_name):
     """Mostra a tela de gerenciamento de processos para uma data/local específico"""
     data_br = format_date_br(data_iso)
     st.markdown(f"## 📋 Processos - {data_br}")
     st.markdown(f"**Local:** {local_name}")
-
+    
     # Botão para voltar
     if st.button("← Voltar para " + local_name):
         st.session_state.selected_date_local = None
         st.rerun()
-
-    # Botão para adicionar outro local nesta data
+    
     st.markdown("---")
-    if st.button("➕ Adicionar outro local nesta data"):
-        st.session_state["adicionar_local"] = True
-
-    # Lista de locais disponíveis para adicionar (excluindo os já usados na data)
-    def get_locais_disponiveis_para_data(data_iso):
-        locais_usados = []
-        for chave, info in st.session_state.pericias.items():
-            if '_' in chave:
-                data_chave = chave.split('_')[0]
-                if data_chave == data_iso:
-                    locais_usados.append(info['local'])
-        return [l for l in get_all_locais() if l not in locais_usados]
-
-    def adicionar_novo_local_para_data(data_iso, novo_local):
-        chave = f"{data_iso}_{novo_local}"
-        if chave not in st.session_state.pericias:
-            st.session_state.pericias[chave] = {
-                "local": novo_local,
-                "observacoes": "",
-                "criado_por": st.session_state.username,
-                "criado_em": datetime.now().isoformat()
-            }
-        # Inicializa lista de processos para o novo local
-        if chave not in st.session_state.processos:
-            st.session_state.processos[chave] = []
-
-    if st.session_state.get("adicionar_local"):
-        lista_de_locais_disponiveis = get_locais_disponiveis_para_data(data_iso)
-        if not lista_de_locais_disponiveis:
-            st.info("Todos os locais já estão cadastrados nesta data.")
-        else:
-            novo_local = st.selectbox("Selecione o novo local", lista_de_locais_disponiveis)
-            if st.button("Confirmar local"):
-                adicionar_novo_local_para_data(data_iso, novo_local)
-                st.success("Novo local adicionado!")
-                st.session_state["adicionar_local"] = False
-                st.rerun()
-
-    st.markdown("---")
-
+    
     # Chave para identificar os processos desta data/local
     key_processos = f"{data_iso}_{local_name}"
-
+    
     # Inicializar lista de processos se não existir
     if key_processos not in st.session_state.processos:
         st.session_state.processos[key_processos] = []
+    
+    # Formulário para adicionar novo processo
+    with st.expander("➕ Adicionar Novo Processo"):
+        with st.form("add_processo"):
+            col1, col2 = st.columns(2)
 
+            with col1:
+                numero_processo = st.text_input("Número do Processo")
+                nome_parte = st.text_input("Nome da Parte")
+                horario = st.time_input(
+                    "Horário",
+                    value=datetime.strptime("09:00", "%H:%M").time()
+                )
 
+            with col2:
+                tipo_pericia = st.selectbox("Tipo", TIPOS_PERICIA)
+                situacao = st.selectbox("Situação", SITUACOES_PROCESSO)
+
+            # Verificação do intervalo permitido para o horário
+            hora_min = datetime.strptime("08:00", "%H:%M").time()
+            hora_max = datetime.strptime("16:45", "%H:%M").time()
+
+            if horario < hora_min or horario > hora_max:
+                st.error("❌ O horário deve estar entre 08:00 e 16:45.")
+
+            if st.form_submit_button("✅ Adicionar Processo"):
+                if numero_processo and nome_parte:
+                    # Verificar se já existe processo com o mesmo horário nesta data/local
+                    existe_horario = any(
+                        p['horario'] == horario.strftime("%H:%M") for p in st.session_state.processos[key_processos]
+                    )
+                    if existe_horario:
+                        st.error("❌ Já existe um processo cadastrado neste horário!")
+                    elif horario < hora_min or horario > hora_max:
+                        st.error("❌ O horário deve estar entre 08:00 e 16:45.")
+                    else:
+                        novo_processo = {
+                            "numero_processo": numero_processo,
+                            "nome_parte": nome_parte,
+                            "horario": horario.strftime("%H:%M"),
+                            "tipo": tipo_pericia,
+                            "situacao": situacao,
+                            "criado_por": st.session_state.username,
+                            "criado_em": datetime.now().isoformat()
+                        }
+                        st.session_state.processos[key_processos].append(novo_processo)
+                        st.success("✅ Processo adicionado com sucesso!")
+                        st.rerun()
+                else:
+                    st.error("❌ Número do processo e nome da parte são obrigatórios!")
+    
     # Listar processos existentes
     processos_lista = st.session_state.processos.get(key_processos, [])
 
-    # Funções auxiliares para ações confirmadas
-    def excluir_processo(processo_id):
-        st.session_state.processos[key_processos].pop(processo_id)
-        st.success("🗑️ Processo excluído com sucesso.")
-        st.session_state["processo_acao_flag"] = None
-        st.session_state["processo_acao_tipo"] = None
-        st.rerun()
-
-
-    def marcar_como_ausente(processo_id):
-        st.session_state.processos[key_processos][processo_id]['situacao'] = 'Ausente'
-        st.session_state["processo_acao_flag"] = None
-        st.session_state["processo_acao_tipo"] = None
-
-    def realizar_acao_confirmada(processo_id):
-        acao = st.session_state.get("processo_acao_tipo")
-        if acao == "excluir":
-            excluir_processo(processo_id)
-        elif acao == "ausente":
-            marcar_como_ausente(processo_id)
-
-    # Função para exibir sigla do tipo de processo
-    def tipo_sigla(tipo):
-        tipo = tipo or ""
-        tipo = tipo.strip()
-        # Mapeamento conforme solicitado
-        if tipo.lower().startswith("auxílio doença"):
-            return "AD"
-        elif tipo.lower().startswith("bpc") or "loas" in tipo.lower():
-            return "BPC"
-        elif "dpvat" in tipo.upper():
-            return "DPVAT"
-        elif "medicação" in tipo.lower() or "perícia médica" in tipo.lower() or tipo.lower().startswith("perícia médica") or tipo.strip().upper() == "MED":
-            return "MED"
-        else:
-            # fallback: usar maiúsculas da sigla se for entre parênteses
-            import re
-            m = re.search(r"\(([A-Z]+)\)", tipo)
-            if m:
-                return m.group(1)
-            return tipo
-
     if processos_lista:
         st.markdown("### 📋 Processos Cadastrados")
+
         # Ordenar por horário
         processos_ordenados = sorted(processos_lista, key=lambda x: x['horario'])
-        # Novo cabeçalho de colunas
-        colunas = ["Anexar Processo", "Horário", "Número do Processo", "Nome da parte", "Tipo", "Situação", "Ação"]
-        header_cols = st.columns([2, 2, 3, 3, 2, 2, 2])
-        for i, nome_col in enumerate(colunas):
-            header_cols[i].markdown(f"**{nome_col}**")
+
+        # Exibir manualmente em colunas: Anexar Processo, Horário, Número do Processo, Nome da parte, Situação, Excluir
+        header_cols = st.columns([2, 2, 3, 3, 2, 1])
+        header_cols[0].markdown("**Anexar Processo**")
+        header_cols[1].markdown("**Horário**")
+        header_cols[2].markdown("**Número do Processo**")
+        header_cols[3].markdown("**Nome da parte**")
+        header_cols[4].markdown("**Situação**")
+        header_cols[5].markdown("**Excluir**")
+
         for idx, processo in enumerate(processos_ordenados):
-            processo_id = idx
-            # Exibir confirmação de ação se necessário (localizado)
-            if st.session_state.get("processo_acao_flag") == processo_id:
-                with st.container():
-                    st.warning("Tem certeza desta ação?")
-                    col_sim, col_nao = st.columns([1, 1])
-                    if col_sim.button("Sim", key=f"sim_{processo_id}"):
-                        realizar_acao_confirmada(processo_id)
-                        return
-                    if col_nao.button("Não", key=f"nao_{processo_id}"):
-                        st.session_state["processo_acao_flag"] = None
-                        st.session_state["processo_acao_tipo"] = None
-                        st.rerun()
-                        return
-                continue
-            # Linha normal de processo
-            row_cols = st.columns([2, 2, 3, 3, 2, 2, 2])
+            row_cols = st.columns([2, 2, 3, 3, 2, 1])
+            # Anexar Processo - file_uploader (em breve)
             with row_cols[0]:
+                #st.file_uploader("Anexar PDF", key=f"file_{key_processos}_{idx}", accept_multiple_files=False, type="pdf")
                 st.button("📎 Em breve", key=f"anexar_{key_processos}_{idx}", disabled=True)
             row_cols[1].write(processo['horario'])
             row_cols[2].write(processo['numero_processo'])
             row_cols[3].write(processo['nome_parte'])
-            # Exibir apenas a sigla do tipo
-            row_cols[4].write(tipo_sigla(processo.get('tipo', '')))
-            row_cols[5].write(processo['situacao'])
-            # Botões de ação lado a lado, largura igual, sem texto verticalizado
-            with row_cols[6]:
-                action_cols = st.columns([1, 1, 1])
-                # Redigir Laudo (desabilitado, só ícone)
-                with action_cols[0]:
-                    st.button("", key=f"laudo_{key_processos}_{idx}", icon="✏️", disabled=True)
-                # Ausente
-                with action_cols[1]:
-                    if processo['situacao'].lower() != 'ausente':
-                        ausente_clicked = st.button("", key=f"ausente_{processo_id}", icon="🚫")
-                        if ausente_clicked and not (st.session_state.get("processo_acao_flag") == processo_id and st.session_state.get("processo_acao_tipo") == "ausente"):
-                            st.session_state["processo_acao_flag"] = processo_id
-                            st.session_state["processo_acao_tipo"] = "ausente"
-                            st.rerun()
-                # Excluir
-                with action_cols[2]:
-                    excluir_clicked = st.button("", key=f"excluir_{processo_id}", icon="🗑️")
-                    if excluir_clicked and not (st.session_state.get("processo_acao_flag") == processo_id and st.session_state.get("processo_acao_tipo") == "excluir"):
-                        st.session_state["processo_acao_flag"] = processo_id
-                        st.session_state["processo_acao_tipo"] = "excluir"
-                        st.rerun()
+            row_cols[4].write(processo['situacao'])
+            with row_cols[5]:
+                if st.button("🗑️", key=f"del_proc_{key_processos}_{idx}"):
+                    # Remover processo da lista
+                    st.session_state.processos[key_processos] = [
+                        p for p in st.session_state.processos[key_processos]
+                        if not (p['numero_processo'] == processo['numero_processo'] and
+                                p['nome_parte'] == processo['nome_parte'] and
+                                p['horario'] == processo['horario'])
+                    ]
+                    st.success("✅ Processo excluído com sucesso!")
+                    st.rerun()
+
+        # Opções de edição (mantido se necessário)
+        if has_permission(st.session_state.user_info, 'editar_pericias'):
+            st.markdown("### ✏️ Editar Processo")
+            opcoes_processos = [f"{p['horario']} - {p['numero_processo']} - {p['nome_parte']}" for p in processos_ordenados]
+            if opcoes_processos:
+                processo_selecionado = st.selectbox("Selecione o processo para editar:", [""] + opcoes_processos)
+                if processo_selecionado:
+                    indice_processo = opcoes_processos.index(processo_selecionado)
+                    processo_atual = processos_ordenados[indice_processo]
+                    with st.form("edit_processo"):
+                        st.markdown("#### Editar Processo")
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            novo_numero = st.text_input("Número do Processo", value=processo_atual['numero_processo'])
+                            novo_nome = st.text_input("Nome da Parte", value=processo_atual['nome_parte'])
+                            novo_horario = st.time_input("Horário", value=datetime.strptime(processo_atual['horario'], "%H:%M").time())
+                        with col2:
+                            novo_tipo = st.selectbox("Tipo", TIPOS_PERICIA, index=TIPOS_PERICIA.index(processo_atual['tipo']))
+                            nova_situacao = st.selectbox("Situação", SITUACOES_PROCESSO, index=SITUACOES_PROCESSO.index(processo_atual['situacao']))
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            if st.form_submit_button("✅ Salvar Alterações", type="primary"):
+                                # Encontrar o processo original na lista
+                                for i, p in enumerate(st.session_state.processos[key_processos]):
+                                    if (p['numero_processo'] == processo_atual['numero_processo'] and
+                                        p['nome_parte'] == processo_atual['nome_parte'] and
+                                        p['horario'] == processo_atual['horario']):
+                                        st.session_state.processos[key_processos][i] = {
+                                            "numero_processo": novo_numero,
+                                            "nome_parte": novo_nome,
+                                            "horario": novo_horario.strftime("%H:%M"),
+                                            "tipo": novo_tipo,
+                                            "situacao": nova_situacao,
+                                            "criado_por": processo_atual['criado_por'],
+                                            "criado_em": processo_atual['criado_em'],
+                                            "editado_por": st.session_state.username,
+                                            "editado_em": datetime.now().isoformat()
+                                        }
+                                        break
+                                st.success("✅ Processo atualizado com sucesso!")
+                                st.rerun()
+                        with col2:
+                            # Exclusão já disponível acima, pode omitir
+                            pass
+
         # Estatísticas dos processos (ajustado)
         st.markdown("### 📊 Estatísticas dos Processos")
         col1, col2, col3 = st.columns(3)
@@ -491,8 +469,8 @@ def show_processos_view(data_iso, local_name):
             total_realizadas = len([p for p in processos_lista if p['situacao'] == 'Concluído'])
             st.metric("Total de Perícias Realizadas", total_realizadas)
         with col3:
-            total_ausentes = len([p for p in processos_lista if p['situacao'].lower() == 'ausente'])
-            st.metric("Total de Ausentes", total_ausentes)
+            st.metric("Total de Ausentes", 0)
+
     else:
         st.info("📭 Nenhum processo cadastrado para esta data/local ainda.")
 def main():
@@ -674,7 +652,7 @@ def main():
                 with col1:
                     current_password = st.text_input("Senha Atual", type="password")
                     new_password = st.text_input("Nova Senha", type="password")
-    
+                with col2:
                     confirm_password = st.text_input("Confirmar Nova Senha", type="password")
                 
                 col1, col2 = st.columns(2)
@@ -729,7 +707,7 @@ def main():
                             perm_editar_pericias = st.checkbox("Editar perícias", value=False)
                             perm_deletar_pericias = st.checkbox("Deletar perícias", value=False)
                             perm_gerenciar_processos = st.checkbox("Gerenciar processos", value=True)
-                        
+                            
                         with col2:
                             st.markdown("**📊 Visualização e Filtros**")
                             perm_visualizar_todas_pericias = st.checkbox("Ver todas as perícias", value=True)
@@ -794,7 +772,7 @@ def main():
                             else:
                                 st.write("• Nenhuma permissão ativa")
                     
-                    :
+                    with col2:
                         if username != st.session_state.username:
                             if st.button("🗑️ Remover", key=f"del_{username}", type="secondary"):
                                 del st.session_state.users[username]
@@ -810,7 +788,7 @@ def main():
             show_local_specific_view(st.session_state.current_local_filter)
         
         else:
-            # Interface principal - calendáriowith col2
+            # Interface principal - calendário
             tab1, tab2 = st.tabs(["📅 Calendário e Perícias", "📋 Gerenciar Perícias"])
             
             with tab1:
@@ -840,26 +818,21 @@ def main():
                 with col1:
                     create_calendar_view(selected_year, selected_month)
                 
-                # Se o usuário clicou em um dia com múltiplos locais, exibe multiselect para escolher locais
+                # Se o usuário clicou em um dia com múltiplos locais, exibe selectbox para escolher o local
                 if st.session_state.selected_date_multilocais and has_permission(user_info, 'agendar_pericias'):
                     date_info = st.session_state.selected_date_multilocais
                     date_str = date_info["date"]
                     locais = date_info["locais"]
                     date_formatted = format_date_br(date_str)
                     st.markdown("---")
-                    st.markdown(f"### 📍 Escolha o(s) local(is) para {date_formatted}")
-                    locais_escolhidos = st.multiselect("Selecione os locais", locais, default=locais, key="multiselect_multilocais")
+                    st.markdown(f"### 📍 Escolha o local para {date_formatted}")
+                    local_escolhido = st.selectbox("Selecione o local", locais, key="selectbox_multilocais")
                     col1, col2 = st.columns(2)
                     with col1:
-                        if st.button("✅ Confirmar Local(is)"):
-                            if locais_escolhidos:
-                                # Se selecionar mais de um, mostra apenas o primeiro (ou pode iterar, mas manter lógica atual)
-                                # Aqui, abre o primeiro local selecionado
-                                st.session_state.selected_date_local = {"data": date_str, "local": locais_escolhidos[0]}
-                                st.session_state.selected_date_multilocais = None
-                                st.rerun()
-                            else:
-                                st.warning("Selecione ao menos um local.")
+                        if st.button("✅ Confirmar Local"):
+                            st.session_state.selected_date_local = {"data": date_str, "local": local_escolhido}
+                            st.session_state.selected_date_multilocais = None
+                            st.rerun()
                     with col2:
                         if st.button("❌ Cancelar"):
                             st.session_state.selected_date_multilocais = None
@@ -884,33 +857,43 @@ def main():
                     
                     if pericias_existentes:
                         st.info(f"📍 Já há perícias agendadas nesta data em: {', '.join(pericias_existentes)}")
-
-                    st.markdown("#### ➕ Cadastrar nova perícia em outro local")
-                    st.markdown("*Mesmo dia, local diferente:*")
                     
                     with st.form("add_pericia"):
                         # Apenas local e observações, sem horário
-                        local_pericia = st.selectbox("Escolha outro local da perícia", get_all_locais())
+                        local_pericia = st.selectbox("Local da Perícia", get_all_locais())
                         observacoes = st.text_area("Observações (opcional)")
                         
                         col1, col2 = st.columns(2)
                         with col1:
                             if st.form_submit_button("✅ Confirmar Perícia", type="primary"):
-                                # Criar chave composta de data + local (permite múltiplas perícias no mesmo dia)
-                                chave_base = st.session_state.selected_date
-                                chave_completa = f"{chave_base}_{local_pericia}"
-                                if chave_completa not in st.session_state.pericias:
-                                    st.session_state.pericias[chave_completa] = {
+                                # Verificar se já existe perícia neste local/data
+                                ja_existe = False
+                                for chave, info in st.session_state.pericias.items():
+                                    if '_' in chave:
+                                        data_chave = chave.split('_')[0]
+                                    else:
+                                        data_chave = chave
+                                    
+                                    # Aceita agendamento no mesmo dia se for em local diferente
+                                    if data_chave == st.session_state.selected_date and info['local'] == local_pericia:
+                                        ja_existe = True
+                                        break
+                                
+                                if not ja_existe:
+                                    # Criar chave única para cada perícia
+                                    chave_pericia = f"{st.session_state.selected_date}_{local_pericia}"
+                                    st.session_state.pericias[chave_pericia] = {
                                         "local": local_pericia,
                                         "observacoes": observacoes,
                                         "criado_por": st.session_state.username,
                                         "criado_em": datetime.now().isoformat()
                                     }
                                     st.success("✅ Perícia agendada com sucesso!")
+                                    st.session_state.selected_date = None
+                                    st.rerun()
                                 else:
-                                    st.warning("⚠️ Já há perícia agendada neste local e data.")
-                                st.session_state.selected_date = None
-                                st.rerun()
+                                    st.error(f"❌ Já existe uma perícia agendada para {local_pericia} nesta data!")
+                        
                         with col2:
                             if st.form_submit_button("❌ Cancelar"):
                                 st.session_state.selected_date = None
