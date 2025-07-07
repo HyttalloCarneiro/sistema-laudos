@@ -414,35 +414,33 @@ def show_processos_view(data_iso, local_name):
             row_cols[4].write(processo['situacao'])
             # Coluna de ações
             with row_cols[5]:
-                # Botão para redigir laudo (em breve)
-                st.button("📝 Laudo", key=f"laudo_{key_processos}_{idx}", disabled=True)
-
-                # Botão para marcar Ausente com dupla confirmação
-                if processo['situacao'].lower() != 'ausente':
-                    if st.button("🚫 Ausente", key=f"ausente_{key_processos}_{idx}"):
+                # Linha única de botões: Laudo, Ausente, Excluir
+                col_laudo, col_ausente, col_excluir = st.columns(3)
+                with col_laudo:
+                    st.button("📝 Laudo", key=f"laudo_{key_processos}_{idx}", disabled=True)
+                with col_ausente:
+                    if processo['situacao'].lower() != 'ausente':
                         if st.session_state.get(f"confirm_ausente_{key_processos}_{idx}", False):
-                            for i, p in enumerate(st.session_state.processos[key_processos]):
-                                if (
-                                    p['numero_processo'] == processo['numero_processo']
-                                    and p['nome_parte'] == processo['nome_parte']
-                                    and p['horario'] == processo['horario']
-                                ):
-                                    st.session_state.processos[key_processos][i]['situacao'] = 'Ausente'
-                                    st.success("🚫 Processo marcado como ausente.")
-                                    st.experimental_rerun()
+                            if st.button("🚫 Confirmar Ausente", key=f"confirmar_ausente_{key_processos}_{idx}", type="secondary"):
+                                st.session_state.processos[key_processos][idx]['situacao'] = 'Ausente'
+                                st.success("🚫 Processo marcado como ausente.")
+                                del st.session_state[f"confirm_ausente_{key_processos}_{idx}"]
+                                st.rerun()
                         else:
-                            st.session_state[f"confirm_ausente_{key_processos}_{idx}"] = True
-                            st.warning("Clique novamente para confirmar ausência!")
-
-                # Botão para excluir processo com dupla confirmação
-                if st.button("🗑️ Excluir", key=f"excluir_{key_processos}_{idx}"):
+                            if st.button("🚫 Ausente", key=f"ausente_{key_processos}_{idx}"):
+                                st.session_state[f"confirm_ausente_{key_processos}_{idx}"] = True
+                                st.warning("Tem certeza que deseja marcar como ausente?")
+                with col_excluir:
                     if st.session_state.get(f"confirm_excluir_{key_processos}_{idx}", False):
-                        st.session_state.processos[key_processos].pop(idx)
-                        st.success("🗑️ Processo excluído com sucesso.")
-                        st.experimental_rerun()
+                        if st.button("🗑️ Confirmar Exclusão", key=f"confirmar_excluir_{key_processos}_{idx}", type="secondary"):
+                            st.session_state.processos[key_processos].pop(idx)
+                            st.success("🗑️ Processo excluído com sucesso.")
+                            del st.session_state[f"confirm_excluir_{key_processos}_{idx}"]
+                            st.rerun()
                     else:
-                        st.session_state[f"confirm_excluir_{key_processos}_{idx}"] = True
-                        st.warning("Clique novamente para confirmar exclusão!")
+                        if st.button("🗑️ Excluir", key=f"excluir_{key_processos}_{idx}"):
+                            st.session_state[f"confirm_excluir_{key_processos}_{idx}"] = True
+                            st.warning("Tem certeza que deseja excluir?")
 
         # Opções de edição (mantido se necessário)
         if has_permission(st.session_state.user_info, 'editar_pericias'):
