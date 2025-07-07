@@ -521,11 +521,14 @@ def show_processos_view(data_iso, local_name):
                 with action_cols[1]:
                     if processo['situacao'].lower() == 'ausente':
                         if st.button("Baixar Certidão", key=f"baixar_certidao_{processo_id}"):
+                            from datetime import datetime
+                            data_convertida = datetime.strptime(data_iso, "%Y-%m-%d")
                             buffer = gerar_certidao_ausencia(
-                                processo['nome_parte'],
-                                processo['numero_processo'],
-                                processo.get('horario'),
-                                data_iso,
+                                processo["numero_processo"],
+                                processo["nome_parte"],
+                                processo["tipo"],
+                                processo["horario"],
+                                data_convertida,
                                 local_name
                             )
                             st.download_button(
