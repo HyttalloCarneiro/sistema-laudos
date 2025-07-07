@@ -458,6 +458,7 @@ def show_processos_view(data_iso, local_name):
         b64 = base64.b64encode(buffer.read()).decode()
         href = f'<a href="data:application/pdf;base64,{b64}" download="certidao_ausencia_{processo["numero_processo"]}.pdf">📄 Baixar Certidão</a>'
         st.markdown(href, unsafe_allow_html=True)
+        st.session_state["certidao_ausencia_pdf"] = href
         st.session_state["processo_acao_flag"] = None
         st.session_state["processo_acao_tipo"] = None
         st.rerun()
@@ -468,6 +469,8 @@ def show_processos_view(data_iso, local_name):
             excluir_processo(processo_id)
         elif acao == "ausente":
             marcar_como_ausente(processo_id)
+        # Limpa botão de certidão após ação
+        st.session_state["certidao_ausencia_pdf"] = None
 
     if processos_lista:
         st.markdown("### 📋 Processos Cadastrados")
@@ -480,11 +483,11 @@ def show_processos_view(data_iso, local_name):
             header_cols[i].markdown(f"**{nome_col}**")
         for idx, processo in enumerate(processos_ordenados):
             processo_id = idx
-            # Exibir confirmação de ação se necessário
+            # Exibir confirmação de ação se necessário (localizado)
             if st.session_state.get("processo_acao_flag") == processo_id:
                 with st.container():
                     st.warning("Tem certeza desta ação?")
-                    col_sim, col_nao = st.columns(2)
+                    col_sim, col_nao = st.columns([1, 1])
                     if col_sim.button("Sim", key=f"sim_{processo_id}"):
                         realizar_acao_confirmada(processo_id)
                         return
@@ -523,6 +526,9 @@ def show_processos_view(data_iso, local_name):
                         st.session_state["processo_acao_flag"] = processo_id
                         st.session_state["processo_acao_tipo"] = "excluir"
                         st.rerun()
+            # Exibe botão de download de certidão de ausência se aplicável
+            if processo['situacao'].lower() == 'ausente' and st.session_state.get("certidao_ausencia_pdf"):
+                st.markdown(st.session_state["certidao_ausencia_pdf"], unsafe_allow_html=True)
         # Estatísticas dos processos (ajustado)
         st.markdown("### 📊 Estatísticas dos Processos")
         col1, col2, col3 = st.columns(3)
