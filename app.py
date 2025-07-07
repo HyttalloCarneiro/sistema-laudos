@@ -483,14 +483,15 @@ def show_processos_view(data_iso, local_name):
             # Exibir confirmação de ação se necessário
             if st.session_state.get("confirmar_acao") == processo_id:
                 st.warning("Tem certeza desta ação?")
-                col1, col2 = st.columns([1, 1])
-                with col1:
+                col_sim, col_nao = st.columns(2)
+                with col_sim:
                     if st.button("Sim", key=f"sim_{processo_id}"):
                         realizar_acao_confirmada(processo_id)
-                with col2:
+                with col_nao:
                     if st.button("Não", key=f"nao_{processo_id}"):
-                        st.session_state["confirmar_acao"] = None
-                        st.session_state["acao_desejada"] = None
+                        st.session_state.pop("confirmar_acao", None)
+                        st.session_state.pop("acao_desejada", None)
+                        st.experimental_rerun()
                 # Não exibe o restante da linha se está exibindo confirmação
                 continue
             # Linha normal de processo
@@ -504,18 +505,18 @@ def show_processos_view(data_iso, local_name):
             # Botões de ação lado a lado, largura igual, sem texto verticalizado
             with row_cols[5]:
                 action_cols = st.columns(3)
-                # Redigir Laudo (desabilitado)
+                # Redigir Laudo (desabilitado, só ícone)
                 with action_cols[0]:
-                    st.button("Redigir Laudo", key=f"laudo_{key_processos}_{idx}", disabled=True)
+                    st.button("", key=f"laudo_{key_processos}_{idx}", icon="✏️", disabled=True)
                 # Ausente
                 with action_cols[1]:
                     if processo['situacao'].lower() != 'ausente':
-                        if st.button("Ausente", key=f"ausente_{processo_id}"):
+                        if st.button("", key=f"ausente_{processo_id}", icon="🚫"):
                             st.session_state["confirmar_acao"] = processo_id
                             st.session_state["acao_desejada"] = "ausente"
                 # Excluir
                 with action_cols[2]:
-                    if st.button("Excluir", key=f"excluir_{processo_id}"):
+                    if st.button("", key=f"excluir_{processo_id}", icon="🗑️"):
                         st.session_state["confirmar_acao"] = processo_id
                         st.session_state["acao_desejada"] = "excluir"
         # Estatísticas dos processos (ajustado)
