@@ -4,7 +4,13 @@ import calendar
 from datetime import datetime, date
 import json
 import locale
-from fpdf import FPDF
+try:
+    from fpdf import FPDF
+except ModuleNotFoundError:
+    import subprocess
+    import sys
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "fpdf"])
+    from fpdf import FPDF
 
 # Configuração da página
 st.set_page_config(
@@ -392,78 +398,79 @@ def show_processos_view(data_iso, local_name):
     # Listar processos existentes
     processos_lista = st.session_state.processos.get(key_processos, [])
 
+    # Funções auxiliares para ações confirmadas
+    def excluir_processo(processo_id):
+        # processo_id = idx na lista ordenada
+        st.session_state.processos[key_processos].pop(processo_id)
+        st.success("🗑️ Processo excluído com sucesso.")
+        st.rerun()
+
+    def marcar_como_ausente(processo_id):
+        processo = processos_ordenados[processo_id]
+        st.session_state.processos[key_processos][processo_id]['situacao'] = 'Ausente'
+        # Gerar PDF de certidão de ausência
+        pdf = FPDF()
+        pdf.add_page()
+        pdf.set_font("Arial", size=12)
+        cert_text = f"Certifico que o(a) periciando(a) {processo['nome_parte']}, referente ao processo {processo['numero_processo']}, não compareceu à perícia agendada para o dia {format_date_br(data_iso)}, às {processo['horario']}, no local {local_name}."
+        pdf.multi_cell(0, 10, cert_text)
+        pdf_output = pdf.output(dest='S').encode('latin-1')
+        st.download_button("📄 Baixar Certidão de Ausência", data=pdf_output, file_name=f"certidao_ausencia_{processo['numero_processo']}.pdf", mime="application/pdf")
+        st.rerun()
+
+    def realizar_acao_confirmada(processo_id):
+        acao = st.session_state.get("acao_desejada")
+        if acao == "excluir":
+            excluir_processo(processo_id)
+        elif acao == "ausente":
+            marcar_como_ausente(processo_id)
+
     if processos_lista:
         st.markdown("### 📋 Processos Cadastrados")
-
         # Ordenar por horário
         processos_ordenados = sorted(processos_lista, key=lambda x: x['horario'])
-
         # Novo cabeçalho de colunas
         colunas = ["Anexar Processo", "Horário", "Número do Processo", "Nome da parte", "Situação", "Ação"]
         header_cols = st.columns([2, 2, 3, 3, 2, 2])
         for i, nome_col in enumerate(colunas):
             header_cols[i].markdown(f"**{nome_col}**")
-
         for idx, processo in enumerate(processos_ordenados):
+            processo_id = idx
+            # Confirmação de ação (substitui modal)
+            if st.session_state.get("confirm_action") == processo_id:
+                st.warning("Tem certeza desta ação?")
+                col1, col2 = st.columns(2)
+                with col1:
+                    if st.button("Sim", key=f"confirma_{processo_id}"):
+                        realizar_acao_confirmada(processo_id)
+                        st.session_state["confirm_action"] = None
+                with col2:
+                    if st.button("Não", key=f"cancela_{processo_id}"):
+                        st.session_state["confirm_action"] = None
+                return
+            # Linha normal
             row_cols = st.columns([2, 2, 3, 3, 2, 2])
-            # Anexar Processo - file_uploader (em breve)
             with row_cols[0]:
                 st.button("📎 Em breve", key=f"anexar_{key_processos}_{idx}", disabled=True)
             row_cols[1].write(processo['horario'])
             row_cols[2].write(processo['numero_processo'])
             row_cols[3].write(processo['nome_parte'])
             row_cols[4].write(processo['situacao'])
-            # Coluna de ações
             with row_cols[5]:
-                # Linha única de ícones: Laudo, Ausente, Excluir (sem texto, apenas ícones, espaçamento)
                 col_laudo, col_ausente, col_excluir = st.columns([1, 1, 1], gap="small")
                 with col_laudo:
                     st.button("📝", key=f"laudo_{key_processos}_{idx}", disabled=True)
-                with col_ausente:
-                    # NOVA LÓGICA MODAL AUSENTE
-                    if processo['situacao'].lower() != 'ausente':
-                        if st.button("🚫", key=f"ausente_{key_processos}_{idx}"):
-                            st.session_state[f"show_modal_ausente_{key_processos}_{idx}"] = True
-                        if st.session_state.get(f"show_modal_ausente_{key_processos}_{idx}", False):
-                            with st.modal("Tem certeza desta ação?"):
-                                st.write("Deseja marcar o processo como **ausente**?")
-                                col_sim, col_nao = st.columns(2)
-                                with col_sim:
-                                    if st.button("✅ Sim", key=f"confirma_ausente_{key_processos}_{idx}"):
-                                        st.session_state.processos[key_processos][idx]['situacao'] = 'Ausente'
-                                        from fpdf import FPDF
-                                        pdf = FPDF()
-                                        pdf.add_page()
-                                        pdf.set_font("Arial", size=12)
-                                        cert_text = f"Certifico que o(a) periciando(a) {processo['nome_parte']}, referente ao processo {processo['numero_processo']}, não compareceu à perícia agendada para o dia {format_date_br(data_iso)}, às {processo['horario']}, no local {local_name}."
-                                        pdf.multi_cell(0, 10, cert_text)
-                                        pdf_output = pdf.output(dest='S').encode('latin-1')
-                                        st.download_button("📄 Baixar Certidão de Ausência", data=pdf_output, file_name=f"certidao_ausencia_{processo['numero_processo']}.pdf", mime="application/pdf")
-                                        st.session_state[f"show_modal_ausente_{key_processos}_{idx}"] = False
-                                        st.rerun()
-                                with col_nao:
-                                    if st.button("❌ Não", key=f"cancela_ausente_{key_processos}_{idx}"):
-                                        st.session_state[f"show_modal_ausente_{key_processos}_{idx}"] = False
-                                        st.rerun()
-                with col_excluir:
-                    # NOVA LÓGICA MODAL EXCLUIR
-                    if st.button("🗑️", key=f"excluir_{key_processos}_{idx}"):
-                        st.session_state[f"show_modal_excluir_{key_processos}_{idx}"] = True
-                    if st.session_state.get(f"show_modal_excluir_{key_processos}_{idx}", False):
-                        with st.modal("Tem certeza desta ação?"):
-                            st.write("Deseja realmente excluir este processo?")
-                            col_sim, col_nao = st.columns(2)
-                            with col_sim:
-                                if st.button("✅ Sim", key=f"confirma_excluir_{key_processos}_{idx}"):
-                                    st.session_state.processos[key_processos].pop(idx)
-                                    st.session_state[f"show_modal_excluir_{key_processos}_{idx}"] = False
-                                    st.success("🗑️ Processo excluído com sucesso.")
-                                    st.rerun()
-                            with col_nao:
-                                if st.button("❌ Não", key=f"cancela_excluir_{key_processos}_{idx}"):
-                                    st.session_state[f"show_modal_excluir_{key_processos}_{idx}"] = False
-                                    st.rerun()
-
+                # Só mostra botões se não está em confirmação
+                if st.session_state.get("confirm_action") != processo_id:
+                    with col_ausente:
+                        if processo['situacao'].lower() != 'ausente':
+                            if st.button("🚫", key=f"ausente_{processo_id}"):
+                                st.session_state["confirm_action"] = processo_id
+                                st.session_state["acao_desejada"] = "ausente"
+                    with col_excluir:
+                        if st.button("🗑️", key=f"excluir_{processo_id}"):
+                            st.session_state["confirm_action"] = processo_id
+                            st.session_state["acao_desejada"] = "excluir"
         # Estatísticas dos processos (ajustado)
         st.markdown("### 📊 Estatísticas dos Processos")
         col1, col2, col3 = st.columns(3)
@@ -476,7 +483,6 @@ def show_processos_view(data_iso, local_name):
         with col3:
             total_ausentes = len([p for p in processos_lista if p['situacao'].lower() == 'ausente'])
             st.metric("Total de Ausentes", total_ausentes)
-
     else:
         st.info("📭 Nenhum processo cadastrado para esta data/local ainda.")
 def main():
@@ -824,21 +830,26 @@ def main():
                 with col1:
                     create_calendar_view(selected_year, selected_month)
                 
-                # Se o usuário clicou em um dia com múltiplos locais, exibe selectbox para escolher o local
+                # Se o usuário clicou em um dia com múltiplos locais, exibe multiselect para escolher locais
                 if st.session_state.selected_date_multilocais and has_permission(user_info, 'agendar_pericias'):
                     date_info = st.session_state.selected_date_multilocais
                     date_str = date_info["date"]
                     locais = date_info["locais"]
                     date_formatted = format_date_br(date_str)
                     st.markdown("---")
-                    st.markdown(f"### 📍 Escolha o local para {date_formatted}")
-                    local_escolhido = st.selectbox("Selecione o local", locais, key="selectbox_multilocais")
+                    st.markdown(f"### 📍 Escolha o(s) local(is) para {date_formatted}")
+                    locais_escolhidos = st.multiselect("Selecione os locais", locais, default=locais, key="multiselect_multilocais")
                     col1, col2 = st.columns(2)
                     with col1:
-                        if st.button("✅ Confirmar Local"):
-                            st.session_state.selected_date_local = {"data": date_str, "local": local_escolhido}
-                            st.session_state.selected_date_multilocais = None
-                            st.rerun()
+                        if st.button("✅ Confirmar Local(is)"):
+                            if locais_escolhidos:
+                                # Se selecionar mais de um, mostra apenas o primeiro (ou pode iterar, mas manter lógica atual)
+                                # Aqui, abre o primeiro local selecionado
+                                st.session_state.selected_date_local = {"data": date_str, "local": locais_escolhidos[0]}
+                                st.session_state.selected_date_multilocais = None
+                                st.rerun()
+                            else:
+                                st.warning("Selecione ao menos um local.")
                     with col2:
                         if st.button("❌ Cancelar"):
                             st.session_state.selected_date_multilocais = None
