@@ -435,15 +435,24 @@ def show_processos_view(data_iso, local_name):
             row_cols[3].write(processo['nome_parte'])
             row_cols[4].write(processo['tipo'].split('(')[-1].replace(')', ''))
             row_cols[5].write(processo['situacao'])
+            # Novo bloco unificado de botões de ação
             with row_cols[6]:
-                # Substituído bloco inteiro do col_a até o st.button("📝", ...) por apenas o botão sem mensagem
-                if st.button("📝", key=f"laudo_{key_processos}_{idx}"):
-                    pass  # A função será implementada posteriormente
-                col_b, col_c = st.columns(2)
+                col_a, col_b, col_c = st.columns([1, 1, 1])
+
+                # Exibe botão de redigir laudo apenas se a situação não for Ausente
+                if processo['situacao'] != 'Ausente':
+                    with col_a:
+                        if st.button("📝", key=f"laudo_{key_processos}_{idx}"):
+                            pass  # A função será implementada posteriormente
+                else:
+                    with col_a:
+                        st.write("")  # Ocupa o espaço para manter alinhamento
+
                 with col_b:
                     if st.button("🚫", key=f"ausente_{key_processos}_{idx}"):
                         st.session_state.confirm_action = ("ausencia", key_processos, processo)
                         st.rerun()
+
                 with col_c:
                     if st.button("🗑️", key=f"excluir_{key_processos}_{idx}"):
                         st.session_state.confirm_action = ("excluir", key_processos, processo)
@@ -504,7 +513,8 @@ def show_processos_view(data_iso, local_name):
             total_realizadas = len([p for p in processos_lista if p['situacao'] == 'Concluído'])
             st.metric("Total de Perícias Realizadas", total_realizadas)
         with col3:
-            st.metric("Total de Ausentes", 0)
+            total_ausentes = len([p for p in processos_lista if p['situacao'] == 'Ausente'])
+            st.metric("Total de Ausentes", total_ausentes)
 
     else:
         st.info("📭 Nenhum processo cadastrado para esta data/local ainda.")
