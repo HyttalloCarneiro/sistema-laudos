@@ -932,27 +932,29 @@ def main():
                                         data_chave = chave.split('_')[0]
                                     else:
                                         data_chave = chave
-
-                                    # Aceita agendamento no mesmo dia se for em local diferente
                                     if data_chave == st.session_state.selected_date and info['local'] == local_pericia:
                                         ja_existe = True
                                         break
 
                                 if not ja_existe:
-                                    # Criar chave única para cada perícia
-                                    chave_pericia = f"{st.session_state.selected_date}_{local_pericia}"
-                                    st.session_state.pericias[chave_pericia] = {
+                                    # Gerenciar vínculo de múltiplos locais
+                                    data = st.session_state.selected_date
+                                    info_pericia = {
                                         "local": local_pericia,
                                         "observacoes": observacoes,
                                         "criado_por": st.session_state.username,
                                         "criado_em": datetime.now().isoformat()
                                     }
 
-                                    # Atualizar pericias_por_dia
-                                    if st.session_state.selected_date not in st.session_state.pericias_por_dia:
-                                        st.session_state.pericias_por_dia[st.session_state.selected_date] = []
-                                    if local_pericia not in st.session_state.pericias_por_dia[st.session_state.selected_date]:
-                                        st.session_state.pericias_por_dia[st.session_state.selected_date].append(local_pericia)
+                                    chave = f"{data}_{local_pericia}"
+                                    st.session_state.pericias[chave] = info_pericia
+
+                                    # Atualizar pericias_por_dia para permitir múltiplos locais por data
+                                    if data not in st.session_state.pericias_por_dia:
+                                        st.session_state.pericias_por_dia[data] = [local_pericia]
+                                    else:
+                                        if local_pericia not in st.session_state.pericias_por_dia[data]:
+                                            st.session_state.pericias_por_dia[data].append(local_pericia)
 
                                     st.success("✅ Perícia agendada com sucesso!")
                                     st.session_state.selected_date = None
