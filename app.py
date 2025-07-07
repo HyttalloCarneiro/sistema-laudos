@@ -414,78 +414,33 @@ def show_processos_view(data_iso, local_name):
             row_cols[4].write(processo['situacao'])
             # Coluna de ações
             with row_cols[5]:
-                # Linha única de botões: Laudo, Ausente, Excluir
-                col_laudo, col_ausente, col_excluir = st.columns(3)
+                # Linha única de ícones: Laudo, Ausente, Excluir (sem texto, apenas ícones, espaçamento)
+                col_laudo, col_ausente, col_excluir = st.columns([1, 1, 1], gap="small")
                 with col_laudo:
-                    st.button("📝 Laudo", key=f"laudo_{key_processos}_{idx}", disabled=True)
+                    st.button("📝", key=f"laudo_{key_processos}_{idx}", disabled=True)
                 with col_ausente:
                     if processo['situacao'].lower() != 'ausente':
                         if st.session_state.get(f"confirm_ausente_{key_processos}_{idx}", False):
-                            if st.button("🚫 Confirmar Ausente", key=f"confirmar_ausente_{key_processos}_{idx}", type="secondary"):
+                            if st.button("🚫", key=f"confirmar_ausente_{key_processos}_{idx}", type="secondary"):
                                 st.session_state.processos[key_processos][idx]['situacao'] = 'Ausente'
                                 st.success("🚫 Processo marcado como ausente.")
                                 del st.session_state[f"confirm_ausente_{key_processos}_{idx}"]
                                 st.rerun()
                         else:
-                            if st.button("🚫 Ausente", key=f"ausente_{key_processos}_{idx}"):
+                            if st.button("🚫", key=f"ausente_{key_processos}_{idx}"):
                                 st.session_state[f"confirm_ausente_{key_processos}_{idx}"] = True
                                 st.warning("Tem certeza que deseja marcar como ausente?")
                 with col_excluir:
                     if st.session_state.get(f"confirm_excluir_{key_processos}_{idx}", False):
-                        if st.button("🗑️ Confirmar Exclusão", key=f"confirmar_excluir_{key_processos}_{idx}", type="secondary"):
+                        if st.button("🗑️", key=f"confirmar_excluir_{key_processos}_{idx}", type="secondary"):
                             st.session_state.processos[key_processos].pop(idx)
                             st.success("🗑️ Processo excluído com sucesso.")
                             del st.session_state[f"confirm_excluir_{key_processos}_{idx}"]
                             st.rerun()
                     else:
-                        if st.button("🗑️ Excluir", key=f"excluir_{key_processos}_{idx}"):
+                        if st.button("🗑️", key=f"excluir_{key_processos}_{idx}"):
                             st.session_state[f"confirm_excluir_{key_processos}_{idx}"] = True
                             st.warning("Tem certeza que deseja excluir?")
-
-        # Opções de edição (mantido se necessário)
-        if has_permission(st.session_state.user_info, 'editar_pericias'):
-            st.markdown("### ✏️ Editar Processo")
-            opcoes_processos = [f"{p['horario']} - {p['numero_processo']} - {p['nome_parte']}" for p in processos_ordenados]
-            if opcoes_processos:
-                processo_selecionado = st.selectbox("Selecione o processo para editar:", [""] + opcoes_processos)
-                if processo_selecionado:
-                    indice_processo = opcoes_processos.index(processo_selecionado)
-                    processo_atual = processos_ordenados[indice_processo]
-                    with st.form("edit_processo"):
-                        st.markdown("#### Editar Processo")
-                        col1, col2 = st.columns(2)
-                        with col1:
-                            novo_numero = st.text_input("Número do Processo", value=processo_atual['numero_processo'])
-                            novo_nome = st.text_input("Nome da Parte", value=processo_atual['nome_parte'])
-                            novo_horario = st.time_input("Horário", value=datetime.strptime(processo_atual['horario'], "%H:%M").time())
-                        with col2:
-                            novo_tipo = st.selectbox("Tipo", TIPOS_PERICIA, index=TIPOS_PERICIA.index(processo_atual['tipo']))
-                            nova_situacao = st.selectbox("Situação", SITUACOES_PROCESSO, index=SITUACOES_PROCESSO.index(processo_atual['situacao']))
-                        col1, col2 = st.columns(2)
-                        with col1:
-                            if st.form_submit_button("✅ Salvar Alterações", type="primary"):
-                                # Encontrar o processo original na lista
-                                for i, p in enumerate(st.session_state.processos[key_processos]):
-                                    if (p['numero_processo'] == processo_atual['numero_processo'] and
-                                        p['nome_parte'] == processo_atual['nome_parte'] and
-                                        p['horario'] == processo_atual['horario']):
-                                        st.session_state.processos[key_processos][i] = {
-                                            "numero_processo": novo_numero,
-                                            "nome_parte": novo_nome,
-                                            "horario": novo_horario.strftime("%H:%M"),
-                                            "tipo": novo_tipo,
-                                            "situacao": nova_situacao,
-                                            "criado_por": processo_atual['criado_por'],
-                                            "criado_em": processo_atual['criado_em'],
-                                            "editado_por": st.session_state.username,
-                                            "editado_em": datetime.now().isoformat()
-                                        }
-                                        break
-                                st.success("✅ Processo atualizado com sucesso!")
-                                st.rerun()
-                        with col2:
-                            # Exclusão já disponível acima, pode omitir
-                            pass
 
         # Estatísticas dos processos (ajustado)
         st.markdown("### 📊 Estatísticas dos Processos")
