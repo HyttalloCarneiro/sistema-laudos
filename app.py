@@ -397,6 +397,7 @@ def show_processos_view(data_iso, local_name):
                         ]
                         st.success("✅ Processo excluído com sucesso!")
                     del st.session_state.confirm_action
+                    st.session_state.selected_date_local = {"data": chave.split('_')[0], "local": chave.split('_')[1]}
                     st.rerun()
             with col_nao:
                 if st.button("❌ Não"):
@@ -409,26 +410,26 @@ def show_processos_view(data_iso, local_name):
         # Ordenar por horário
         processos_ordenados = sorted(processos_lista, key=lambda x: x['horario'])
 
-        # Exibir manualmente em colunas: Anexar Processo, Horário, Tipo, Número do Processo, Nome da parte, Ação
-        header_cols = st.columns([2, 2, 2, 3, 3, 2])
+        # Novo cabeçalho das colunas
+        header_cols = st.columns([2, 2, 3, 3, 1.5, 2, 2])
         header_cols[0].markdown("**Anexar Processo**")
         header_cols[1].markdown("**Horário**")
-        header_cols[2].markdown("**Tipo**")
-        header_cols[3].markdown("**Número do Processo**")
-        header_cols[4].markdown("**Nome da parte**")
-        header_cols[5].markdown("**Ação**")
+        header_cols[2].markdown("**Número do Processo**")
+        header_cols[3].markdown("**Nome do periciando**")
+        header_cols[4].markdown("**Tipo**")
+        header_cols[5].markdown("**Situação**")
+        header_cols[6].markdown("**Ação**")
 
         for idx, processo in enumerate(processos_ordenados):
-            row_cols = st.columns([2, 2, 2, 3, 3, 2])
-            # Anexar Processo - file_uploader (em breve)
+            row_cols = st.columns([2, 2, 3, 3, 1.5, 2, 2])
             with row_cols[0]:
-                #st.file_uploader("Anexar PDF", key=f"file_{key_processos}_{idx}", accept_multiple_files=False, type="pdf")
                 st.button("📎 Em breve", key=f"anexar_{key_processos}_{idx}", disabled=True)
             row_cols[1].write(processo['horario'])
-            row_cols[2].write(processo['tipo'])
-            row_cols[3].write(processo['numero_processo'])
-            row_cols[4].write(processo['nome_parte'])
-            with row_cols[5]:
+            row_cols[2].write(processo['numero_processo'])
+            row_cols[3].write(processo['nome_parte'])
+            row_cols[4].write(processo['tipo'].split('(')[-1].replace(')', ''))
+            row_cols[5].write(processo['situacao'])
+            with row_cols[6]:
                 col_a, col_b, col_c = st.columns(3)
                 with col_a:
                     if st.button("📝", key=f"laudo_{key_processos}_{idx}"):
