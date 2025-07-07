@@ -298,11 +298,19 @@ def show_local_specific_view(local_name):
     
     # Estatísticas do local
     st.markdown("### 📊 Estatísticas")
-    # Novo: mostrar apenas "Total de Dias com Perícias"
-    datas_unicas = set()
+    hoje = datetime.now().date()
+    mes_atual = hoje.month
+    ano_atual = hoje.year
+    mes_seguinte = (mes_atual % 12) + 1
+    ano_seguinte = ano_atual + 1 if mes_seguinte == 1 else ano_atual
+
+    datas_mes = set()
     for p in pericias_local:
-        datas_unicas.add(p['Data_Sort'])
-    st.metric("Total de Dias com Perícias", len(datas_unicas))
+        data_obj = datetime.strptime(p['Data_Sort'], "%Y-%m-%d").date()
+        if (data_obj.month == mes_atual and data_obj.year == ano_atual) or (data_obj.month == mes_seguinte and data_obj.year == ano_seguinte):
+            datas_mes.add(data_obj)
+
+    st.metric("Dias com Perícias (Mês Atual + Seguinte)", len(datas_mes))
 
 def show_processos_view(data_iso, local_name):
     """Mostra a tela de gerenciamento de processos para uma data/local específico"""
@@ -867,22 +875,9 @@ def main():
                         col1, col2 = st.columns(2)
                         with col1:
                             if st.form_submit_button("✅ Confirmar Perícia", type="primary"):
-                                # Verificar se já existe perícia neste local/data
-                                ja_existe = False
-                                for chave, info in st.session_state.pericias.items():
-                                    if '_' in chave:
-                                        data_chave = chave.split('_')[0]
-                                    else:
-                                        data_chave = chave
-                                    
-                                    # Aceita agendamento no mesmo dia se for em local diferente
-                                    if data_chave == st.session_state.selected_date and info['local'] == local_pericia:
-                                        ja_existe = True
-                                        break
-                                
-                                if not ja_existe:
-                                    # Criar chave única para cada perícia
-                                    chave_pericia = f"{st.session_state.selected_date}_{local_pericia}"
+                                # Criar chave única para cada perícia
+                                chave_pericia = f"{st.session_state.selected_date}_{local_pericia}"
+                                if chave_pericia not in st.session_state.pericias:
                                     st.session_state.pericias[chave_pericia] = {
                                         "local": local_pericia,
                                         "observacoes": observacoes,
@@ -890,11 +885,10 @@ def main():
                                         "criado_em": datetime.now().isoformat()
                                     }
                                     st.success("✅ Perícia agendada com sucesso!")
-                                    st.session_state.selected_date = None
-                                    st.rerun()
                                 else:
-                                    st.error(f"❌ Já existe uma perícia agendada para {local_pericia} nesta data!")
-                        
+                                    st.warning("⚠️ Perícia já agendada neste local e data.")
+                                st.session_state.selected_date = None
+                                st.rerun()
                         with col2:
                             if st.form_submit_button("❌ Cancelar"):
                                 st.session_state.selected_date = None
