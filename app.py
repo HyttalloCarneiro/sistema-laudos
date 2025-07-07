@@ -386,8 +386,14 @@ def show_processos_view(data_iso, local_name):
             with col_sim:
                 if st.button("✅ Sim"):
                     if acao == "ausencia":
-                        # Lógica para marcar ausência (pode ser expandida)
-                        st.success("Ausência registrada com sucesso.")
+                        # Atualizar a situação do processo para "Ausente"
+                        for i, p in enumerate(st.session_state.processos[chave]):
+                            if (p['numero_processo'] == proc['numero_processo'] and
+                                p['nome_parte'] == proc['nome_parte'] and
+                                p['horario'] == proc['horario']):
+                                st.session_state.processos[chave][i]['situacao'] = 'Ausente'
+                                break
+                        st.success("✅ Ausência registrada com sucesso.")
                     elif acao == "excluir":
                         st.session_state.processos[chave] = [
                             p for p in st.session_state.processos[chave]
@@ -430,10 +436,10 @@ def show_processos_view(data_iso, local_name):
             row_cols[4].write(processo['tipo'].split('(')[-1].replace(')', ''))
             row_cols[5].write(processo['situacao'])
             with row_cols[6]:
-                col_a, col_b, col_c = st.columns(3)
-                with col_a:
-                    if st.button("📝", key=f"laudo_{key_processos}_{idx}"):
-                        st.info("Função de redigir laudo ainda não implementada.")
+                # Substituído bloco inteiro do col_a até o st.button("📝", ...) por apenas o botão sem mensagem
+                if st.button("📝", key=f"laudo_{key_processos}_{idx}"):
+                    pass  # A função será implementada posteriormente
+                col_b, col_c = st.columns(2)
                 with col_b:
                     if st.button("🚫", key=f"ausente_{key_processos}_{idx}"):
                         st.session_state.confirm_action = ("ausencia", key_processos, processo)
