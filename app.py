@@ -4,9 +4,9 @@ import calendar
 from datetime import datetime, date
 import json
 import locale
-from reportlab.pdfgen import canvas
-from io import BytesIO
 import base64
+from io import BytesIO
+from utilidades import gerar_certidao_ausencia
 
 # Configuração da página
 st.set_page_config(
@@ -440,22 +440,7 @@ def show_processos_view(data_iso, local_name):
         st.session_state["processo_acao_tipo"] = None
         st.rerun()
 
-    def gerar_certidao_ausencia(nome, numero, horario=None, data_iso=None, local_name=None):
-        # Gera PDF de certidão de ausência e retorna bytes
-        buffer = BytesIO()
-        c = canvas.Canvas(buffer)
-        c.setFont("Helvetica-Bold", 16)
-        c.drawString(100, 750, "CERTIDÃO DE AUSÊNCIA")
-        c.setFont("Helvetica", 12)
-        c.drawString(100, 720, f"Certifico que a parte {nome} esteve ausente à perícia médica em {format_date_br(data_iso) if data_iso else ''}.")
-        c.drawString(100, 700, f"Número do Processo: {numero}")
-        if horario:
-            c.drawString(100, 680, f"Horário: {horario}")
-        if local_name:
-            c.drawString(100, 660, f"Local: {local_name}")
-        c.save()
-        buffer.seek(0)
-        return buffer.getvalue()
+    # A função gerar_certidao_ausencia é importada de utilidades
 
     def marcar_como_ausente(processo_id):
         processo = processos_ordenados[processo_id]
@@ -535,21 +520,21 @@ def show_processos_view(data_iso, local_name):
                 # Ausente/Certidão de Ausência
                 with action_cols[1]:
                     if processo['situacao'].lower() == 'ausente':
-                        # Botão de download usando st.download_button
-                        pdf_bytes = gerar_certidao_ausencia(
-                            processo['nome_parte'],
-                            processo['numero_processo'],
-                            horario=processo.get('horario'),
-                            data_iso=data_iso,
-                            local_name=local_name
-                        )
-                        st.download_button(
-                            label="📄",
-                            data=pdf_bytes,
-                            file_name=f"certidao_ausencia_{processo['numero_processo']}.pdf",
-                            mime="application/pdf",
-                            key=f"download_certidao_{processo_id}"
-                        )
+                        if st.button("Baixar Certidão", key=f"baixar_certidao_{processo_id}"):
+                            buffer = gerar_certidao_ausencia(
+                                processo['nome_parte'],
+                                processo['numero_processo'],
+                                processo.get('horario'),
+                                data_iso,
+                                local_name
+                            )
+                            st.download_button(
+                                label="📄 Baixar Certidão",
+                                data=buffer,
+                                file_name=f"certidao_ausencia_{processo['numero_processo']}.pdf",
+                                mime="application/pdf",
+                                key=f"download_certidao_{processo_id}"
+                            )
                     else:
                         ausente_clicked = st.button("", key=f"ausente_{processo_id}", icon="🚫")
                         if ausente_clicked and not (st.session_state.get("processo_acao_flag") == processo_id and st.session_state.get("processo_acao_tipo") == "ausente"):
