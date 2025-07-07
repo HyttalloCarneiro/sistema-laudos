@@ -504,10 +504,10 @@ def show_processos_view(data_iso, local_name):
                             pass
 
         # Estatísticas dos processos (ajustado)
-        st.markdown("### 📊 Estatísticas dos Processos")
+        st.markdown("### 📊 Estatísticas de Perícias do Dia")
         col1, col2, col3 = st.columns(3)
         with col1:
-            total_a_realizar = len([p for p in processos_lista if p['situacao'] != 'Concluído'])
+            total_a_realizar = len([p for p in processos_lista if p['situacao'] in ['Pré-laudo', 'Em produção']])
             st.metric("Total de Perícias a Realizar", total_a_realizar)
         with col2:
             total_realizadas = len([p for p in processos_lista if p['situacao'] == 'Concluído'])
