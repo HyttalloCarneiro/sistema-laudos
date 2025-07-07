@@ -477,8 +477,8 @@ def show_processos_view(data_iso, local_name):
         # Ordenar por horário
         processos_ordenados = sorted(processos_lista, key=lambda x: x['horario'])
         # Novo cabeçalho de colunas
-        colunas = ["Anexar Processo", "Horário", "Número do Processo", "Nome da parte", "Situação", "Ação"]
-        header_cols = st.columns([2, 2, 3, 3, 2, 2])
+        colunas = ["Anexar Processo", "Horário", "Número do Processo", "Nome da parte", "Tipo", "Situação", "Ação"]
+        header_cols = st.columns([2, 2, 3, 3, 2, 2, 2])
         for i, nome_col in enumerate(colunas):
             header_cols[i].markdown(f"**{nome_col}**")
         for idx, processo in enumerate(processos_ordenados):
@@ -498,22 +498,44 @@ def show_processos_view(data_iso, local_name):
                         return
                 continue
             # Linha normal de processo
-            row_cols = st.columns([2, 2, 3, 3, 2, 2])
+            row_cols = st.columns([2, 2, 3, 3, 2, 2, 2])
             with row_cols[0]:
                 st.button("📎 Em breve", key=f"anexar_{key_processos}_{idx}", disabled=True)
             row_cols[1].write(processo['horario'])
             row_cols[2].write(processo['numero_processo'])
             row_cols[3].write(processo['nome_parte'])
-            row_cols[4].write(processo['situacao'])
+            # Nova coluna "Tipo"
+            row_cols[4].write(processo.get('tipo', ''))
+            row_cols[5].write(processo['situacao'])
             # Botões de ação lado a lado, largura igual, sem texto verticalizado
-            with row_cols[5]:
+            with row_cols[6]:
                 action_cols = st.columns([1, 1, 1])
                 # Redigir Laudo (desabilitado, só ícone)
                 with action_cols[0]:
                     st.button("", key=f"laudo_{key_processos}_{idx}", icon="✏️", disabled=True)
-                # Ausente
+                # Ausente/Certidão de Ausência
                 with action_cols[1]:
-                    if processo['situacao'].lower() != 'ausente':
+                    if processo['situacao'].lower() == 'ausente':
+                        # Gerar PDF para download diretamente
+                        buffer = BytesIO()
+                        c = canvas.Canvas(buffer)
+                        c.setFont("Helvetica-Bold", 16)
+                        c.drawString(100, 750, "CERTIDÃO DE AUSÊNCIA")
+                        c.setFont("Helvetica", 12)
+                        c.drawString(100, 720, f"Certifico que a parte {processo['nome_parte']} esteve ausente à perícia médica em {format_date_br(data_iso)}.")
+                        c.drawString(100, 700, f"Número do Processo: {processo['numero_processo']}")
+                        c.drawString(100, 680, f"Horário: {processo['horario']}")
+                        c.drawString(100, 660, f"Local: {local_name}")
+                        c.save()
+                        buffer.seek(0)
+                        st.download_button(
+                            label="📄 Baixar Certidão",
+                            data=buffer,
+                            file_name=f"certidao_ausencia_{processo['numero_processo']}.pdf",
+                            mime="application/pdf",
+                            key=f"download_certidao_{processo_id}"
+                        )
+                    else:
                         ausente_clicked = st.button("", key=f"ausente_{processo_id}", icon="🚫")
                         if ausente_clicked and not (st.session_state.get("processo_acao_flag") == processo_id and st.session_state.get("processo_acao_tipo") == "ausente"):
                             st.session_state["processo_acao_flag"] = processo_id
@@ -526,9 +548,6 @@ def show_processos_view(data_iso, local_name):
                         st.session_state["processo_acao_flag"] = processo_id
                         st.session_state["processo_acao_tipo"] = "excluir"
                         st.rerun()
-            # Exibe botão de download de certidão de ausência se aplicável
-            if processo['situacao'].lower() == 'ausente' and st.session_state.get("certidao_ausencia_pdf"):
-                st.markdown(st.session_state["certidao_ausencia_pdf"], unsafe_allow_html=True)
         # Estatísticas dos processos (ajustado)
         st.markdown("### 📊 Estatísticas dos Processos")
         col1, col2, col3 = st.columns(3)
