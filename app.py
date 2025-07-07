@@ -903,7 +903,7 @@ def main():
                     st.markdown("---")
                     date_formatted = format_date_br(st.session_state.selected_date)
                     st.markdown(f"### 📝 Agendar Perícia - {date_formatted}")
-                    
+
                     # Verificar se já há perícias nesta data
                     pericias_existentes = []
                     for chave, info in st.session_state.pericias.items():
@@ -911,18 +911,17 @@ def main():
                             data_chave = chave.split('_')[0]
                         else:
                             data_chave = chave
-                        
                         if data_chave == st.session_state.selected_date:
                             pericias_existentes.append(info['local'])
-                    
+
                     if pericias_existentes:
                         st.info(f"📍 Já há perícias agendadas nesta data em: {', '.join(pericias_existentes)}")
-                    
+
                     with st.form("add_pericia"):
                         # Apenas local e observações, sem horário
                         local_pericia = st.selectbox("Local da Perícia", get_all_locais())
                         observacoes = st.text_area("Observações (opcional)")
-                        
+
                         col1, col2 = st.columns(2)
                         with col1:
                             if st.form_submit_button("✅ Confirmar Perícia", type="primary"):
@@ -933,12 +932,12 @@ def main():
                                         data_chave = chave.split('_')[0]
                                     else:
                                         data_chave = chave
-                                    
+
                                     # Aceita agendamento no mesmo dia se for em local diferente
                                     if data_chave == st.session_state.selected_date and info['local'] == local_pericia:
                                         ja_existe = True
                                         break
-                                
+
                                 if not ja_existe:
                                     # Criar chave única para cada perícia
                                     chave_pericia = f"{st.session_state.selected_date}_{local_pericia}"
@@ -960,17 +959,49 @@ def main():
                                     st.rerun()
                                 else:
                                     st.error(f"❌ Já existe uma perícia agendada para {local_pericia} nesta data!")
-                        
+
                         with col2:
                             if st.form_submit_button("❌ Cancelar"):
                                 st.session_state.selected_date = None
                                 st.rerun()
-                
+
+                # Tela da data: mostrar locais vinculados e permitir vincular outro local
+                # (Nova lógica para múltiplos locais na data)
+                # Exemplo: st.session_state['pericias'][data] pode ser lista ou string
+                if st.session_state.selected_date and st.session_state.selected_date in st.session_state.pericias:
+                    pericias_na_data = st.session_state.pericias[st.session_state.selected_date]
+                    # Mostra selectbox se for lista
+                    if isinstance(pericias_na_data, list):
+                        local_escolhido = st.selectbox(
+                            "Selecione o local de atuação nesta data:",
+                            pericias_na_data,
+                            key="local_escolhido_dia"
+                        )
+                    else:
+                        local_escolhido = pericias_na_data
+                    # Aqui, utilize local_escolhido para carregar processos desse local, etc.
+                    # Exemplo: st.write(f"Processos para o local: {local_escolhido}")
+
+                    # Localize a lógica do botão "Vincular outro local nesta data"
+                    if st.button("🔗 Vincular outro local nesta data"):
+                        locais_disponiveis = [l for l in st.session_state['locais'] if l not in st.session_state['pericias'][st.session_state.selected_date]]
+                        if locais_disponiveis:
+                            novo_local = st.selectbox("Selecione o novo local para vincular:", locais_disponiveis, key="novo_local_vinculo")
+                            if st.button("Salvar local vinculado"):
+                                if isinstance(st.session_state['pericias'][st.session_state.selected_date], list):
+                                    if novo_local not in st.session_state['pericias'][st.session_state.selected_date]:
+                                        st.session_state['pericias'][st.session_state.selected_date].append(novo_local)
+                                else:
+                                    st.session_state['pericias'][st.session_state.selected_date] = [st.session_state['pericias'][st.session_state.selected_date], novo_local]
+                                st.experimental_rerun()
+                        else:
+                            st.info("Todos os locais já estão vinculados a esta data.")
+
                 # Locais de atuação (mantido para compatibilidade)
                 if has_permission(user_info, 'visualizar_locais'):
                     st.markdown("---")
                     st.markdown("### 🏛️ Acesso Rápido aos Locais")
-                    
+
                     # Federais
                     st.markdown("#### ⚖️ Federais")
                     cols = st.columns(3)
@@ -979,7 +1010,7 @@ def main():
                             if st.button(f"📍 {local.split('(')[0].strip()}", key=f"quick_{local}", use_container_width=True):
                                 st.session_state.current_local_filter = local
                                 st.rerun()
-                    
+
                     # Estaduais
                     locais_estaduais_ordenados = sorted(st.session_state.locais_estaduais)
                     if locais_estaduais_ordenados:
@@ -1008,19 +1039,19 @@ def main():
                             data = chave.split('_')[0]
                         else:
                             data = chave
-                        
+
                         pericias_list.append({
                             'Data': format_date_br(data),
                             'Local': info['local'],
                             'Observações': info.get('observacoes', ''),
                             'Criado por': info.get('criado_por', 'N/A')
                         })
-                    
+
                     df = pd.DataFrame(pericias_list)
                     # Ordenar por data
                     df['Data_Sort'] = df['Data'].apply(format_date_iso)
                     df = df.sort_values('Data_Sort', ascending=False).drop('Data_Sort', axis=1)
-                    
+
                     # Filtros (se permitido)
                     if has_permission(user_info, 'filtrar_pericias'):
                         col1, col2 = st.columns(2)
@@ -1030,30 +1061,30 @@ def main():
                                 ["Todos"] + get_all_locais(),
                                 key="filtro_geral"
                             )
-                        
+
                         with col2:
                             filtro_data = st.date_input("Filtrar a partir da data")
-                        
+
                         # Aplicar filtros
                         df_filtrado = df.copy()
                         if filtro_local_geral != "Todos":
                             df_filtrado = df_filtrado[df_filtrado['Local'] == filtro_local_geral]
-                        
+
                         if filtro_data:
                             filtro_data_str = filtro_data.strftime("%d-%m-%Y")
                             df_filtrado['Data_Compare'] = df_filtrado['Data'].apply(format_date_iso)
                             filtro_data_iso = format_date_iso(filtro_data_str)
                             df_filtrado = df_filtrado[df_filtrado['Data_Compare'] >= filtro_data_iso]
                             df_filtrado = df_filtrado.drop('Data_Compare', axis=1)
-                        
+
                         st.dataframe(df_filtrado, use_container_width=True)
                     else:
                         st.dataframe(df, use_container_width=True)
-                    
+
                     # Opção para deletar perícias (apenas se permitido)
                     if has_permission(user_info, 'deletar_pericias'):
                         st.markdown("#### 🗑️ Remover Perícia")
-                        
+
                         # Criar lista de opções com datas formatadas
                         opcoes_remover = [""]
                         for chave in st.session_state.pericias.keys():
@@ -1061,21 +1092,21 @@ def main():
                                 data = chave.split('_')[0]
                             else:
                                 data = chave
-                            
+
                             data_br = format_date_br(data)
                             local = st.session_state.pericias[chave]['local']
                             opcoes_remover.append(f"{data_br} - {local}")
-                        
+
                         data_remover_display = st.selectbox(
                             "Selecione a perícia para remover",
                             opcoes_remover
                         )
-                        
+
                         if data_remover_display and st.button("🗑️ Confirmar Remoção", type="secondary"):
                             # Extrair a data e local da opção selecionada
                             data_br, local = data_remover_display.split(' - ', 1)
                             data_iso = format_date_iso(data_br)
-                            
+
                             # Encontrar a chave correta
                             chave_para_remover = None
                             for chave, info in st.session_state.pericias.items():
@@ -1083,11 +1114,11 @@ def main():
                                     data_chave = chave.split('_')[0]
                                 else:
                                     data_chave = chave
-                                
+
                                 if data_chave == data_iso and info['local'] == local:
                                     chave_para_remover = chave
                                     break
-                            
+
                             if chave_para_remover:
                                 del st.session_state.pericias[chave_para_remover]
                                 # Também remover processos associados se existirem
@@ -1101,3 +1132,12 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+# Calendário inicial: destaque datas com múltiplos locais
+# Exemplo de código para destacar datas com múltiplos locais
+# (Coloque este trecho no local apropriado para exibir a lista de datas)
+# for data, locais in st.session_state['pericias'].items():
+#     if isinstance(locais, list) and len(locais) > 1:
+#         st.markdown(f"📌 **{data.strftime('%d-%m-%Y')}** — {len(locais)} locais")
+#     else:
+#         st.markdown(f"📅 {data.strftime('%d-%m-%Y')} — {locais if isinstance(locais, str) else locais[0]}")
