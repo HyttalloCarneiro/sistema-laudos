@@ -378,41 +378,69 @@ def show_processos_view(data_iso, local_name):
     processos_lista = st.session_state.processos.get(key_processos, [])
 
     if processos_lista:
+        # Tela de confirmação de ação
+        if "confirm_action" in st.session_state:
+            acao, chave, proc = st.session_state.confirm_action
+            st.warning(f"⚠️ Deseja realmente confirmar esta ação: {acao.upper()} para o processo {proc['numero_processo']} de {proc['nome_parte']} às {proc['horario']}?")
+            col_sim, col_nao = st.columns(2)
+            with col_sim:
+                if st.button("✅ Sim"):
+                    if acao == "ausencia":
+                        # Lógica para marcar ausência (pode ser expandida)
+                        st.success("Ausência registrada com sucesso.")
+                    elif acao == "excluir":
+                        st.session_state.processos[chave] = [
+                            p for p in st.session_state.processos[chave]
+                            if not (p['numero_processo'] == proc['numero_processo'] and
+                                    p['nome_parte'] == proc['nome_parte'] and
+                                    p['horario'] == proc['horario'])
+                        ]
+                        st.success("✅ Processo excluído com sucesso!")
+                    del st.session_state.confirm_action
+                    st.rerun()
+            with col_nao:
+                if st.button("❌ Não"):
+                    del st.session_state.confirm_action
+                    st.rerun()
+            return
+
         st.markdown("### 📋 Processos Cadastrados")
 
         # Ordenar por horário
         processos_ordenados = sorted(processos_lista, key=lambda x: x['horario'])
 
-        # Exibir manualmente em colunas: Anexar Processo, Horário, Número do Processo, Nome da parte, Situação, Excluir
-        header_cols = st.columns([2, 2, 3, 3, 2, 1])
+        # Exibir manualmente em colunas: Anexar Processo, Horário, Tipo, Número do Processo, Nome da parte, Ação
+        header_cols = st.columns([2, 2, 2, 3, 3, 2])
         header_cols[0].markdown("**Anexar Processo**")
         header_cols[1].markdown("**Horário**")
-        header_cols[2].markdown("**Número do Processo**")
-        header_cols[3].markdown("**Nome da parte**")
-        header_cols[4].markdown("**Situação**")
-        header_cols[5].markdown("**Excluir**")
+        header_cols[2].markdown("**Tipo**")
+        header_cols[3].markdown("**Número do Processo**")
+        header_cols[4].markdown("**Nome da parte**")
+        header_cols[5].markdown("**Ação**")
 
         for idx, processo in enumerate(processos_ordenados):
-            row_cols = st.columns([2, 2, 3, 3, 2, 1])
+            row_cols = st.columns([2, 2, 2, 3, 3, 2])
             # Anexar Processo - file_uploader (em breve)
             with row_cols[0]:
                 #st.file_uploader("Anexar PDF", key=f"file_{key_processos}_{idx}", accept_multiple_files=False, type="pdf")
                 st.button("📎 Em breve", key=f"anexar_{key_processos}_{idx}", disabled=True)
             row_cols[1].write(processo['horario'])
-            row_cols[2].write(processo['numero_processo'])
-            row_cols[3].write(processo['nome_parte'])
-            row_cols[4].write(processo['situacao'])
+            row_cols[2].write(processo['tipo'])
+            row_cols[3].write(processo['numero_processo'])
+            row_cols[4].write(processo['nome_parte'])
             with row_cols[5]:
-                if st.button("🗑️", key=f"del_proc_{key_processos}_{idx}"):
-                    # Remover processo da lista
-                    st.session_state.processos[key_processos] = [
-                        p for p in st.session_state.processos[key_processos]
-                        if not (p['numero_processo'] == processo['numero_processo'] and
-                                p['nome_parte'] == processo['nome_parte'] and
-                                p['horario'] == processo['horario'])
-                    ]
-                    st.success("✅ Processo excluído com sucesso!")
-                    st.rerun()
+                col_a, col_b, col_c = st.columns(3)
+                with col_a:
+                    if st.button("📝", key=f"laudo_{key_processos}_{idx}"):
+                        st.info("Função de redigir laudo ainda não implementada.")
+                with col_b:
+                    if st.button("🚫", key=f"ausente_{key_processos}_{idx}"):
+                        st.session_state.confirm_action = ("ausencia", key_processos, processo)
+                        st.rerun()
+                with col_c:
+                    if st.button("🗑️", key=f"excluir_{key_processos}_{idx}"):
+                        st.session_state.confirm_action = ("excluir", key_processos, processo)
+                        st.rerun()
 
         # Opções de edição (mantido se necessário)
         if has_permission(st.session_state.user_info, 'editar_pericias'):
