@@ -535,7 +535,7 @@ def show_processos_view(data_iso, local_name):
                 # Ausente/Certidão de Ausência
                 with action_cols[1]:
                     if processo['situacao'].lower() == 'ausente':
-                        # Adiciona botão de download direto na célula da tabela
+                        # Botão de download usando st.download_button
                         pdf_bytes = gerar_certidao_ausencia(
                             processo['nome_parte'],
                             processo['numero_processo'],
@@ -543,9 +543,13 @@ def show_processos_view(data_iso, local_name):
                             data_iso=data_iso,
                             local_name=local_name
                         )
-                        b64 = base64.b64encode(pdf_bytes).decode()
-                        href = f'<a href="data:application/octet-stream;base64,{b64}" download="certidao_ausencia_{processo["numero_processo"]}.pdf"><button title="Baixar Certidão de Ausência">📄</button></a>'
-                        st.markdown(href, unsafe_allow_html=True)
+                        st.download_button(
+                            label="📄",
+                            data=pdf_bytes,
+                            file_name=f"certidao_ausencia_{processo['numero_processo']}.pdf",
+                            mime="application/pdf",
+                            key=f"download_certidao_{processo_id}"
+                        )
                     else:
                         ausente_clicked = st.button("", key=f"ausente_{processo_id}", icon="🚫")
                         if ausente_clicked and not (st.session_state.get("processo_acao_flag") == processo_id and st.session_state.get("processo_acao_tipo") == "ausente"):
