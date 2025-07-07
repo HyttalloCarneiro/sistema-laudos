@@ -484,18 +484,15 @@ def show_processos_view(data_iso, local_name):
             if st.session_state.get("processo_acao_flag") == processo_id:
                 with st.container():
                     st.warning("Tem certeza desta ação?")
-                    cols_confirm = st.columns([1, 1, 1])
-                    with cols_confirm[1]:
-                        col_sim, col_nao = st.columns([1, 1])
-                        sim_clicked = col_sim.button("Sim", key=f"sim_{processo_id}")
-                        nao_clicked = col_nao.button("Não", key=f"nao_{processo_id}")
-                        if sim_clicked:
-                            realizar_acao_confirmada(processo_id)
-                        elif nao_clicked:
-                            st.session_state["processo_acao_flag"] = None
-                            st.session_state["processo_acao_tipo"] = None
-                            st.experimental_rerun()
-                # Não exibe o restante da linha se está exibindo confirmação
+                    col_sim, col_nao = st.columns(2)
+                    if col_sim.button("Sim", key=f"sim_{processo_id}"):
+                        realizar_acao_confirmada(processo_id)
+                        return
+                    if col_nao.button("Não", key=f"nao_{processo_id}"):
+                        st.session_state["processo_acao_flag"] = None
+                        st.session_state["processo_acao_tipo"] = None
+                        st.rerun()
+                        return
                 continue
             # Linha normal de processo
             row_cols = st.columns([2, 2, 3, 3, 2, 2])
@@ -518,14 +515,14 @@ def show_processos_view(data_iso, local_name):
                         if ausente_clicked and not (st.session_state.get("processo_acao_flag") == processo_id and st.session_state.get("processo_acao_tipo") == "ausente"):
                             st.session_state["processo_acao_flag"] = processo_id
                             st.session_state["processo_acao_tipo"] = "ausente"
-                            st.experimental_rerun()
+                            st.rerun()
                 # Excluir
                 with action_cols[2]:
                     excluir_clicked = st.button("", key=f"excluir_{processo_id}", icon="🗑️")
                     if excluir_clicked and not (st.session_state.get("processo_acao_flag") == processo_id and st.session_state.get("processo_acao_tipo") == "excluir"):
                         st.session_state["processo_acao_flag"] = processo_id
                         st.session_state["processo_acao_tipo"] = "excluir"
-                        st.experimental_rerun()
+                        st.rerun()
         # Estatísticas dos processos (ajustado)
         st.markdown("### 📊 Estatísticas dos Processos")
         col1, col2, col3 = st.columns(3)
