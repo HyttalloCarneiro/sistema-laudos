@@ -6,7 +6,6 @@ import json
 import locale
 import base64
 from io import BytesIO
-from utilidades import gerar_certidao_ausencia
 
 # Configuração da página
 st.set_page_config(
@@ -448,10 +447,8 @@ def show_processos_view(data_iso, local_name):
         st.session_state["processo_acao_tipo"] = None
         st.rerun()
 
-    # A função gerar_certidao_ausencia é importada de utilidades
 
     def marcar_como_ausente(processo_id):
-        processo = processos_ordenados[processo_id]
         st.session_state.processos[key_processos][processo_id]['situacao'] = 'Ausente'
         st.session_state["processo_acao_flag"] = None
         st.session_state["processo_acao_tipo"] = None
@@ -525,28 +522,9 @@ def show_processos_view(data_iso, local_name):
                 # Redigir Laudo (desabilitado, só ícone)
                 with action_cols[0]:
                     st.button("", key=f"laudo_{key_processos}_{idx}", icon="✏️", disabled=True)
-                # Ausente/Certidão de Ausência
+                # Ausente
                 with action_cols[1]:
-                    if processo['situacao'].lower() == 'ausente':
-                        if st.button("Baixar Certidão", key=f"baixar_certidao_{processo_id}"):
-                            from datetime import datetime
-                            data_convertida = datetime.strptime(data_iso, "%Y-%m-%d")
-                            buffer = gerar_certidao_ausencia(
-                                processo["numero_processo"],
-                                processo["nome_parte"],
-                                processo["tipo"],
-                                processo["horario"],
-                                data_convertida,
-                                local_name
-                            )
-                            st.download_button(
-                                label="📄 Baixar Certidão",
-                                data=buffer,
-                                file_name=f"certidao_ausencia_{processo['numero_processo']}.pdf",
-                                mime="application/pdf",
-                                key=f"download_certidao_{processo_id}"
-                            )
-                    else:
+                    if processo['situacao'].lower() != 'ausente':
                         ausente_clicked = st.button("", key=f"ausente_{processo_id}", icon="🚫")
                         if ausente_clicked and not (st.session_state.get("processo_acao_flag") == processo_id and st.session_state.get("processo_acao_tipo") == "ausente"):
                             st.session_state["processo_acao_flag"] = processo_id
@@ -568,27 +546,6 @@ def show_processos_view(data_iso, local_name):
         with col2:
             total_realizadas = len([p for p in processos_lista if p['situacao'] == 'Concluído'])
             st.metric("Total de Perícias Realizadas", total_realizadas)
-            # Botão de download de certidão de ausência, apenas se processo estiver ausente
-            for idx, processo in enumerate(processos_ordenados):
-                processo_id = idx
-                if processo['situacao'].lower() == 'ausente':
-                    from datetime import datetime
-                    data_convertida = datetime.strptime(data_iso, "%Y-%m-%d")
-                    buffer = gerar_certidao_ausencia(
-                        processo["numero_processo"],
-                        processo["nome_parte"],
-                        processo["tipo"],
-                        processo["horario"],
-                        data_convertida,
-                        local_name
-                    )
-                    st.download_button(
-                        label="📄 Baixar Certidão",
-                        data=buffer,
-                        file_name=f"certidao_ausencia_{processo['numero_processo']}.pdf",
-                        mime="application/pdf",
-                        key=f"download_certidao_{processo_id}"
-                    )
         with col3:
             total_ausentes = len([p for p in processos_lista if p['situacao'].lower() == 'ausente'])
             st.metric("Total de Ausentes", total_ausentes)
