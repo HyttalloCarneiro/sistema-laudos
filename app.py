@@ -4,13 +4,9 @@ import calendar
 from datetime import datetime, date
 import json
 import locale
-try:
-    from fpdf import FPDF
-except ModuleNotFoundError:
-    import subprocess
-    import sys
-    subprocess.check_call([sys.executable, "-m", "pip", "install", "fpdf"])
-    from fpdf import FPDF
+from reportlab.pdfgen import canvas
+from io import BytesIO
+import base64
 
 # Configuração da página
 st.set_page_config(
@@ -329,26 +325,65 @@ def show_processos_view(data_iso, local_name):
     data_br = format_date_br(data_iso)
     st.markdown(f"## 📋 Processos - {data_br}")
     st.markdown(f"**Local:** {local_name}")
-    
+
     # Botão para voltar
     if st.button("← Voltar para " + local_name):
         st.session_state.selected_date_local = None
         st.rerun()
-    
+
+    # Botão para adicionar outro local nesta data
     st.markdown("---")
-    
+    if st.button("➕ Adicionar outro local nesta data"):
+        st.session_state["adicionar_local"] = True
+
+    # Lista de locais disponíveis para adicionar (excluindo os já usados na data)
+    def get_locais_disponiveis_para_data(data_iso):
+        locais_usados = []
+        for chave, info in st.session_state.pericias.items():
+            if '_' in chave:
+                data_chave = chave.split('_')[0]
+                if data_chave == data_iso:
+                    locais_usados.append(info['local'])
+        return [l for l in get_all_locais() if l not in locais_usados]
+
+    def adicionar_novo_local_para_data(data_iso, novo_local):
+        chave = f"{data_iso}_{novo_local}"
+        if chave not in st.session_state.pericias:
+            st.session_state.pericias[chave] = {
+                "local": novo_local,
+                "observacoes": "",
+                "criado_por": st.session_state.username,
+                "criado_em": datetime.now().isoformat()
+            }
+        # Inicializa lista de processos para o novo local
+        if chave not in st.session_state.processos:
+            st.session_state.processos[chave] = []
+
+    if st.session_state.get("adicionar_local"):
+        lista_de_locais_disponiveis = get_locais_disponiveis_para_data(data_iso)
+        if not lista_de_locais_disponiveis:
+            st.info("Todos os locais já estão cadastrados nesta data.")
+        else:
+            novo_local = st.selectbox("Selecione o novo local", lista_de_locais_disponiveis)
+            if st.button("Confirmar local"):
+                adicionar_novo_local_para_data(data_iso, novo_local)
+                st.success("Novo local adicionado!")
+                st.session_state["adicionar_local"] = False
+                st.rerun()
+
+    st.markdown("---")
+
     # Chave para identificar os processos desta data/local
     key_processos = f"{data_iso}_{local_name}"
-    
+
     # Inicializar lista de processos se não existir
     if key_processos not in st.session_state.processos:
         st.session_state.processos[key_processos] = []
-    
+
     # Formulário para adicionar novo processo
     with st.expander("➕ Adicionar Novo Processo"):
         with st.form("add_processo"):
             col1, col2 = st.columns(2)
-
             with col1:
                 numero_processo = st.text_input("Número do Processo")
                 nome_parte = st.text_input("Nome da Parte")
@@ -357,7 +392,6 @@ def show_processos_view(data_iso, local_name):
                     value=datetime.strptime("09:00", "%H:%M").time(),
                     step=900
                 )
-
             with col2:
                 tipo_pericia = st.selectbox("Tipo", TIPOS_PERICIA)
                 situacao = st.selectbox("Situação", SITUACOES_PROCESSO)
@@ -394,28 +428,38 @@ def show_processos_view(data_iso, local_name):
                         st.rerun()
                 else:
                     st.error("❌ Número do processo e nome da parte são obrigatórios!")
-    
+
     # Listar processos existentes
     processos_lista = st.session_state.processos.get(key_processos, [])
 
     # Funções auxiliares para ações confirmadas
     def excluir_processo(processo_id):
-        # processo_id = idx na lista ordenada
         st.session_state.processos[key_processos].pop(processo_id)
         st.success("🗑️ Processo excluído com sucesso.")
+        st.session_state["confirmar_acao"] = None
+        st.session_state["acao_desejada"] = None
         st.rerun()
 
     def marcar_como_ausente(processo_id):
         processo = processos_ordenados[processo_id]
         st.session_state.processos[key_processos][processo_id]['situacao'] = 'Ausente'
-        # Gerar PDF de certidão de ausência
-        pdf = FPDF()
-        pdf.add_page()
-        pdf.set_font("Arial", size=12)
-        cert_text = f"Certifico que o(a) periciando(a) {processo['nome_parte']}, referente ao processo {processo['numero_processo']}, não compareceu à perícia agendada para o dia {format_date_br(data_iso)}, às {processo['horario']}, no local {local_name}."
-        pdf.multi_cell(0, 10, cert_text)
-        pdf_output = pdf.output(dest='S').encode('latin-1')
-        st.download_button("📄 Baixar Certidão de Ausência", data=pdf_output, file_name=f"certidao_ausencia_{processo['numero_processo']}.pdf", mime="application/pdf")
+        # Gerar PDF de certidão de ausência usando reportlab
+        buffer = BytesIO()
+        c = canvas.Canvas(buffer)
+        c.setFont("Helvetica-Bold", 16)
+        c.drawString(100, 750, "CERTIDÃO DE AUSÊNCIA")
+        c.setFont("Helvetica", 12)
+        c.drawString(100, 720, f"Certifico que a parte {processo['nome_parte']} esteve ausente à perícia médica em {format_date_br(data_iso)}.")
+        c.drawString(100, 700, f"Número do Processo: {processo['numero_processo']}")
+        c.drawString(100, 680, f"Horário: {processo['horario']}")
+        c.drawString(100, 660, f"Local: {local_name}")
+        c.save()
+        buffer.seek(0)
+        b64 = base64.b64encode(buffer.read()).decode()
+        href = f'<a href="data:application/pdf;base64,{b64}" download="certidao_ausencia_{processo["numero_processo"]}.pdf">📄 Baixar Certidão</a>'
+        st.markdown(href, unsafe_allow_html=True)
+        st.session_state["confirmar_acao"] = None
+        st.session_state["acao_desejada"] = None
         st.rerun()
 
     def realizar_acao_confirmada(processo_id):
@@ -436,19 +480,20 @@ def show_processos_view(data_iso, local_name):
             header_cols[i].markdown(f"**{nome_col}**")
         for idx, processo in enumerate(processos_ordenados):
             processo_id = idx
-            # Confirmação de ação (substitui modal)
-            if st.session_state.get("confirm_action") == processo_id:
+            # Exibir confirmação de ação se necessário
+            if st.session_state.get("confirmar_acao") == processo_id:
                 st.warning("Tem certeza desta ação?")
-                col1, col2 = st.columns(2)
+                col1, col2 = st.columns([1, 1])
                 with col1:
-                    if st.button("Sim", key=f"confirma_{processo_id}"):
+                    if st.button("Sim", key=f"confirmar_sim_{processo_id}"):
                         realizar_acao_confirmada(processo_id)
-                        st.session_state["confirm_action"] = None
                 with col2:
-                    if st.button("Não", key=f"cancela_{processo_id}"):
-                        st.session_state["confirm_action"] = None
-                return
-            # Linha normal
+                    if st.button("Não", key=f"confirmar_nao_{processo_id}"):
+                        st.session_state["confirmar_acao"] = None
+                        st.session_state["acao_desejada"] = None
+                # Não exibe o restante da linha se está exibindo confirmação
+                continue
+            # Linha normal de processo
             row_cols = st.columns([2, 2, 3, 3, 2, 2])
             with row_cols[0]:
                 st.button("📎 Em breve", key=f"anexar_{key_processos}_{idx}", disabled=True)
@@ -459,18 +504,16 @@ def show_processos_view(data_iso, local_name):
             with row_cols[5]:
                 col_laudo, col_ausente, col_excluir = st.columns([1, 1, 1], gap="small")
                 with col_laudo:
-                    st.button("📝", key=f"laudo_{key_processos}_{idx}", disabled=True)
-                # Só mostra botões se não está em confirmação
-                if st.session_state.get("confirm_action") != processo_id:
-                    with col_ausente:
-                        if processo['situacao'].lower() != 'ausente':
-                            if st.button("🚫", key=f"ausente_{processo_id}"):
-                                st.session_state["confirm_action"] = processo_id
-                                st.session_state["acao_desejada"] = "ausente"
-                    with col_excluir:
-                        if st.button("🗑️", key=f"excluir_{processo_id}"):
-                            st.session_state["confirm_action"] = processo_id
-                            st.session_state["acao_desejada"] = "excluir"
+                    st.button("Redigir Laudo", key=f"laudo_{key_processos}_{idx}", disabled=True)
+                with col_ausente:
+                    if processo['situacao'].lower() != 'ausente':
+                        if st.button("Ausente", key=f"ausente_{processo_id}"):
+                            st.session_state["confirmar_acao"] = processo_id
+                            st.session_state["acao_desejada"] = "ausente"
+                with col_excluir:
+                    if st.button("Excluir", key=f"excluir_{processo_id}"):
+                        st.session_state["confirmar_acao"] = processo_id
+                        st.session_state["acao_desejada"] = "excluir"
         # Estatísticas dos processos (ajustado)
         st.markdown("### 📊 Estatísticas dos Processos")
         col1, col2, col3 = st.columns(3)
