@@ -138,6 +138,8 @@ def init_session_data():
     
     if 'selected_date_local' not in st.session_state:
         st.session_state.selected_date_local = None
+    if 'selected_date_multilocais' not in st.session_state:
+        st.session_state.selected_date_multilocais = None
 
 def authenticate_user(username, password):
     """Autentica usuário"""
@@ -191,7 +193,6 @@ def create_calendar_view(year, month):
                         pericias_do_dia.append(info['local'])
 
                 if pericias_do_dia:
-                    # Mostrar quantas perícias há no dia
                     num_pericias = len(pericias_do_dia)
                     if num_pericias == 1:
                         local_short = pericias_do_dia[0].split('(')[0].strip()[:10]
@@ -212,7 +213,12 @@ def create_calendar_view(year, month):
                             type="primary",
                             use_container_width=True
                         ):
-                            st.session_state.selected_date_local = f"{date_str}_{pericias_do_dia[0]}"
+                            # Salva a lista de locais para esse dia em selected_date_multilocais
+                            st.session_state.selected_date_multilocais = {
+                                "date": date_str,
+                                "locais": pericias_do_dia
+                            }
+                            st.session_state.selected_date = None
                             st.rerun()
                 else:
                     if cols[i].button(f"{day}", key=f"day_{date_str}", use_container_width=True):
@@ -821,8 +827,28 @@ def main():
                 with col1:
                     create_calendar_view(selected_year, selected_month)
                 
+                # Se o usuário clicou em um dia com múltiplos locais, exibe selectbox para escolher o local
+                if st.session_state.selected_date_multilocais and has_permission(user_info, 'agendar_pericias'):
+                    date_info = st.session_state.selected_date_multilocais
+                    date_str = date_info["date"]
+                    locais = date_info["locais"]
+                    date_formatted = format_date_br(date_str)
+                    st.markdown("---")
+                    st.markdown(f"### 📍 Escolha o local para {date_formatted}")
+                    local_escolhido = st.selectbox("Selecione o local", locais, key="selectbox_multilocais")
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        if st.button("✅ Confirmar Local"):
+                            st.session_state.selected_date_local = f"{date_str}_{local_escolhido}"
+                            st.session_state.selected_date_multilocais = None
+                            st.rerun()
+                    with col2:
+                        if st.button("❌ Cancelar"):
+                            st.session_state.selected_date_multilocais = None
+                            st.rerun()
+
                 # Formulário para adicionar perícia na data selecionada
-                if st.session_state.selected_date and has_permission(user_info, 'agendar_pericias'):
+                elif st.session_state.selected_date and has_permission(user_info, 'agendar_pericias'):
                     st.markdown("---")
                     date_formatted = format_date_br(st.session_state.selected_date)
                     st.markdown(f"### 📝 Agendar Perícia - {date_formatted}")
@@ -857,6 +883,7 @@ def main():
                                     else:
                                         data_chave = chave
                                     
+                                    # Aceita agendamento no mesmo dia se for em local diferente
                                     if data_chave == st.session_state.selected_date and info['local'] == local_pericia:
                                         ja_existe = True
                                         break
