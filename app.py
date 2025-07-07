@@ -379,10 +379,6 @@ def show_processos_view(data_iso, local_name):
     if key_processos not in st.session_state.processos:
         st.session_state.processos[key_processos] = []
 
-    # Formulário para adicionar novo processo
-    with col2:
-        st.session_state.confirmar_ausencia = index
-        st.experimental_rerun()
 
     # Listar processos existentes
     processos_lista = st.session_state.processos.get(key_processos, [])
@@ -721,7 +717,7 @@ def main():
                         new_role = st.selectbox("Perfil", ["assistente", "administrador"])
                     
                     # Configuração de permissões para assistentes
-                    if with col2new_role == "assistente":
+                    if new_role == "assistente":
                         st.markdown("#### 🔒 Configurar Permissões do Assistente")
                         st.markdown("*Configure quais funcionalidades este assistente poderá acessar:*")
                         
@@ -733,7 +729,7 @@ def main():
                             perm_editar_pericias = st.checkbox("Editar perícias", value=False)
                             perm_deletar_pericias = st.checkbox("Deletar perícias", value=False)
                             perm_gerenciar_processos = st.checkbox("Gerenciar processos", value=True)
-                            
+                        
                         with col2:
                             st.markdown("**📊 Visualização e Filtros**")
                             perm_visualizar_todas_pericias = st.checkbox("Ver todas as perícias", value=True)
