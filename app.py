@@ -459,24 +459,19 @@ def show_processos_view(data_iso, local_name):
 
         for idx, processo in enumerate(processos_ordenados):
             row_cols = st.columns([2, 2, 3, 3, 1.5, 2, 2])
-            # Novo: botão de upload de PDF mais compacto e alinhado ao botão "Ação"
+            # Ícone 📎 abre seletor de arquivo diretamente, sem botão extra
             with row_cols[0]:
-                if st.button("📎", key=f"btn_upload_{key_processos}_{idx}"):
-                    st.session_state[f"show_uploader_{key_processos}_{idx}"] = True
-
-                if st.session_state.get(f"show_uploader_{key_processos}_{idx}", False):
-                    uploaded_file = st.file_uploader(
-                        label="Anexar PDF",
-                        type=["pdf"],
-                        label_visibility="collapsed",
-                        key=f"upload_pdf_{key_processos}_{idx}"
-                    )
-                    if uploaded_file:
-                        if "arquivos_processos" not in st.session_state:
-                            st.session_state.arquivos_processos = {}
-                        st.session_state.arquivos_processos[f"{key_processos}_{idx}"] = uploaded_file
-                        st.success("📎 Arquivo anexado com sucesso.")
-                        st.session_state[f"show_uploader_{key_processos}_{idx}"] = False
+                uploaded_file = st.file_uploader(
+                    label="",
+                    type=["pdf"],
+                    label_visibility="collapsed",
+                    key=f"upload_pdf_{key_processos}_{idx}"
+                )
+                if uploaded_file:
+                    if "arquivos_processos" not in st.session_state:
+                        st.session_state.arquivos_processos = {}
+                    st.session_state.arquivos_processos[f"{key_processos}_{idx}"] = uploaded_file
+                    st.success("📎 Arquivo anexado com sucesso.")
             row_cols[1].write(processo['horario'])
             row_cols[2].write(processo['numero_processo'])
             row_cols[3].write(processo['nome_parte'])
