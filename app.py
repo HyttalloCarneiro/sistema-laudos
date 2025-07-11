@@ -3,7 +3,6 @@ import streamlit as st
 
 openai.api_key = st.secrets["OPENAI_API_KEY"]
 import streamlit as st
-from laudos_ad import redigir_laudo_interface
 import pandas as pd
 import calendar
 from datetime import datetime, date
@@ -482,17 +481,8 @@ def show_processos_view(data_iso, local_name):
                             pass  # A função será implementada posteriormente
                     # Adiciona o botão "✍️ Redigir Laudo"
                     if st.button("✍️ Redigir Laudo", key=f"redigir_{idx}"):
-                        st.session_state["dados_laudo"] = {
-                            "nome_autor": processo.get("nome_parte", ""),
-                            "numero_processo": processo.get("numero_processo", ""),
-                            "der": processo.get("der", ""),
-                            "nb": processo.get("nb", ""),
-                            "cpf": processo.get("cpf", ""),
-                            "rg": processo.get("rg", ""),
-                            "nascimento": processo.get("nascimento", ""),
-                            "profissao": processo.get("profissao", "")
-                        }
-                        st.switch_page("laudos_ad.py")
+                        st.session_state["dados_laudo"] = processo
+                        st.switch_page("pages/laudos_ad.py")
                 else:
                     with col_a:
                         st.write("")  # Ocupa o espaço para manter alinhamento
@@ -1159,9 +1149,6 @@ def main():
 if __name__ == "__main__":
     main()
 
-# Renderizar interface de laudo se dados estiverem disponíveis
-if "dados_laudo" in st.session_state:
-    redigir_laudo_interface(st.session_state["dados_laudo"])
 
 # Calendário inicial: destaque datas com múltiplos locais
 # Exemplo de código para destacar datas com múltiplos locais
