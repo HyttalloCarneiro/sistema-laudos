@@ -410,138 +410,111 @@ def show_processos_view(data_iso, local_name):
     if key_processos not in st.session_state.processos:
         st.session_state.processos[key_processos] = []
     
-    # Seção de Upload de PDF
-    if has_permission(st.session_state.user_info, 'upload_processos'):
-        with st.expander("📄 Upload de Processo (PDF)", expanded=True):
-            st.markdown("**Faça o upload do arquivo PDF do processo para extrair automaticamente os dados principais.**")
-            
-            uploaded_file = st.file_uploader(
-                "Selecione o arquivo PDF do processo",
-                type=['pdf'],
-                key=f"upload_{key_processos}"
-            )
-            
-            if uploaded_file is not None:
-                # Extrair texto do PDF
-                with st.spinner("🔍 Analisando o arquivo PDF..."):
-                    text = extract_text_from_pdf(uploaded_file)
-                
-                if text:
-                    # Extrair dados do processo
-                    extracted_data = extract_process_data(text)
-                    
-                    if extracted_data:
-                        st.success("✅ Dados extraídos com sucesso!")
-                        
-                        # Mostrar dados extraídos em um formulário editável
-                        with st.form(f"process_from_pdf_{key_processos}"):
-                            st.markdown("#### 📝 Dados Extraídos - Confirme ou Edite")
-                            
-                            col1, col2 = st.columns(2)
-                            
-                            with col1:
-                                numero_processo = st.text_input(
-                                    "Número do Processo",
-                                    value=extracted_data.get('numero_processo', ''),
-                                    help="Número extraído automaticamente do PDF"
-                                )
-                                nome_parte = st.text_input(
-                                    "Nome da Parte",
-                                    value=extracted_data.get('nome_parte', ''),
-                                    help="Nome extraído automaticamente do PDF"
-                                )
-                                horario = st.time_input("Horário", value=datetime.strptime("09:00", "%H:%M").time())
-                            
-                            with col2:
-                                tipo_pericia = st.selectbox(
-                                    "Tipo",
-                                    TIPOS_PERICIA,
-                                    index=TIPOS_PERICIA.index(extracted_data.get('tipo_pericia', 'Auxílio Doença (AD)')),
-                                    help="Tipo identificado automaticamente baseado no conteúdo"
-                                )
-                                situacao = st.selectbox("Situação", SITUACOES_PROCESSO)
-                            
-                            # Mostrar prévia do texto extraído
-                            with st.expander("📄 Prévia do Texto Extraído"):
-                                st.text_area(
-                                    "Texto extraído do PDF (primeiras 1000 caracteres):",
-                                    value=text[:1000] + "..." if len(text) > 1000 else text,
-                                    height=200,
-                                    disabled=True
-                                )
-                            
-                            col1, col2 = st.columns(2)
-                            
-                            with col1:
-                                if st.form_submit_button("✅ Adicionar Processo", type="primary"):
-                                    if numero_processo and nome_parte:
-                                        novo_processo = {
-                                            "numero_processo": numero_processo,
-                                            "nome_parte": nome_parte,
-                                            "horario": horario.strftime("%H:%M"),
-                                            "tipo": tipo_pericia,
-                                            "situacao": situacao,
-                                            "criado_por": st.session_state.username,
-                                            "criado_em": datetime.now().isoformat(),
-                                            "origem": "upload_pdf",
-                                            "arquivo_original": uploaded_file.name
-                                        }
-                                        
-                                        st.session_state.processos[key_processos].append(novo_processo)
-                                        st.success("✅ Processo adicionado com sucesso via upload de PDF!")
-                                        st.rerun()
-                                    else:
-                                        st.error("❌ Número do processo e nome da parte são obrigatórios!")
-                            
-                            with col2:
-                                if st.form_submit_button("❌ Cancelar"):
-                                    st.rerun()
-                    else:
-                        st.warning("⚠️ Não foi possível extrair dados suficientes do PDF. Use o formulário manual abaixo.")
-                        
-                        # Mostrar prévia do texto para debug
-                        with st.expander("📄 Texto Extraído (para análise)"):
+    # Bloco único para adicionar processo (PDF ou Manual)
+    import datetime
+    st.markdown("### ➕ Adicionar Processo")
+    opcao = st.radio("Selecione o método de cadastro do processo:", ["PDF (automático)", "Manual"])
+
+    if opcao == "PDF (automático)":
+        st.markdown("#### 📄 Upload de Processo (PDF)")
+        st.markdown("Faça o upload do arquivo PDF do processo para extrair automaticamente os dados principais.")
+        arquivo_pdf = st.file_uploader("Selecione o arquivo PDF do processo", type=["pdf"], key=f"upload_{key_processos}")
+        if arquivo_pdf:
+            # Lógica de extração do processo via PDF
+            # processar_pdf(arquivo_pdf)  # exemplo, substitua pela função real
+            # Aqui adaptamos para usar as funções já existentes
+            with st.spinner("🔍 Analisando o arquivo PDF..."):
+                text = extract_text_from_pdf(arquivo_pdf)
+            if text:
+                extracted_data = extract_process_data(text)
+                if extracted_data:
+                    st.success("Processo extraído com sucesso!")
+                    # Formulário para confirmar/editar dados extraídos
+                    with st.form(f"process_from_pdf_{key_processos}"):
+                        st.markdown("#### 📝 Dados Extraídos - Confirme ou Edite")
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            numero_processo = st.text_input(
+                                "Número do Processo",
+                                value=extracted_data.get('numero_processo', ''),
+                                help="Número extraído automaticamente do PDF"
+                            )
+                            nome_parte = st.text_input(
+                                "Nome da Parte",
+                                value=extracted_data.get('nome_parte', ''),
+                                help="Nome extraído automaticamente do PDF"
+                            )
+                            horario = st.time_input("Horário", value=datetime.time(9, 0))
+                        with col2:
+                            tipo_pericia = st.selectbox(
+                                "Tipo",
+                                TIPOS_PERICIA,
+                                index=TIPOS_PERICIA.index(extracted_data.get('tipo_pericia', 'Auxílio Doença (AD)'))
+                                if extracted_data.get('tipo_pericia', 'Auxílio Doença (AD)') in TIPOS_PERICIA else 0,
+                                help="Tipo identificado automaticamente baseado no conteúdo"
+                            )
+                            situacao = st.selectbox("Situação", SITUACOES_PROCESSO)
+                        with st.expander("📄 Prévia do Texto Extraído"):
                             st.text_area(
-                                "Texto extraído:",
-                                value=text[:2000] + "..." if len(text) > 2000 else text,
-                                height=300,
+                                "Texto extraído do PDF (primeiras 1000 caracteres):",
+                                value=text[:1000] + "..." if len(text) > 1000 else text,
+                                height=200,
                                 disabled=True
                             )
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            if st.form_submit_button("Adicionar Processo"):
+                                if numero_processo and nome_parte:
+                                    novo_processo = {
+                                        "numero_processo": numero_processo,
+                                        "nome_parte": nome_parte,
+                                        "horario": horario.strftime("%H:%M"),
+                                        "tipo": tipo_pericia,
+                                        "situacao": situacao,
+                                        "criado_por": st.session_state.username,
+                                        "criado_em": datetime.now().isoformat(),
+                                        "origem": "upload_pdf",
+                                        "arquivo_original": arquivo_pdf.name
+                                    }
+                                    st.session_state.processos[key_processos].append(novo_processo)
+                                    st.success("Processo adicionado com sucesso via upload de PDF!")
+                                    st.rerun()
+                                else:
+                                    st.error("❌ Número do processo e nome da parte são obrigatórios!")
+                        with col2:
+                            if st.form_submit_button("Cancelar"):
+                                st.rerun()
                 else:
-                    st.error("❌ Não foi possível extrair texto do PDF. Verifique se o arquivo não está protegido ou corrompido.")
-    
-    # Formulário manual para adicionar novo processo
-    with st.expander("➕ Adicionar Processo Manualmente"):
-        with st.form("add_processo_manual"):
-            col1, col2 = st.columns(2)
-            
-            with col1:
-                numero_processo = st.text_input("Número do Processo")
-                nome_parte = st.text_input("Nome da Parte")
-                horario = st.time_input("Horário", value=datetime.strptime("09:00", "%H:%M").time())
-            
-            with col2:
-                tipo_pericia = st.selectbox("Tipo", TIPOS_PERICIA)
-                situacao = st.selectbox("Situação", SITUACOES_PROCESSO)
-            
-            if st.form_submit_button("✅ Adicionar Processo"):
-                if numero_processo and nome_parte:
-                    novo_processo = {
-                        "numero_processo": numero_processo,
-                        "nome_parte": nome_parte,
-                        "horario": horario.strftime("%H:%M"),
-                        "tipo": tipo_pericia,
-                        "situacao": situacao,
-                        "criado_por": st.session_state.username,
-                        "criado_em": datetime.now().isoformat(),
-                        "origem": "manual"
-                    }
-                    
-                    st.session_state.processos[key_processos].append(novo_processo)
-                    st.success("✅ Processo adicionado com sucesso!")
-                    st.rerun()
-                else:
-                    st.error("❌ Número do processo e nome da parte são obrigatórios!")
+                    st.warning("⚠️ Não foi possível extrair dados suficientes do PDF. Use o formulário manual abaixo.")
+                    with st.expander("📄 Texto Extraído (para análise)"):
+                        st.text_area(
+                            "Texto extraído:",
+                            value=text[:2000] + "..." if len(text) > 2000 else text,
+                            height=300,
+                            disabled=True
+                        )
+            else:
+                st.error("❌ Não foi possível extrair texto do PDF. Verifique se o arquivo não está protegido ou corrompido.")
+    elif opcao == "Manual":
+        st.markdown("#### ✍️ Inserir Dados Manualmente")
+        nome = st.text_input("Nome do periciando")
+        numero = st.text_input("Número do Processo")
+        tipo = st.selectbox("Tipo", ["AD", "BPC", "DPVAT"])
+        horario = st.time_input("Horário", value=datetime.time(9, 0))
+        if st.button("Adicionar Processo"):
+            # Adiciona processo manualmente
+            novo_processo = {
+                "numero_processo": numero,
+                "nome_parte": nome,
+                "horario": horario.strftime("%H:%M"),
+                "tipo": tipo,
+                "situacao": "Pré-laudo",
+                "criado_por": st.session_state.username,
+                "criado_em": datetime.now().isoformat(),
+                "origem": "manual"
+            }
+            st.session_state.processos[key_processos].append(novo_processo)
+            st.success("Processo adicionado com sucesso.")
     
     # Listar processos existentes
     processos_lista = st.session_state.processos.get(key_processos, [])
