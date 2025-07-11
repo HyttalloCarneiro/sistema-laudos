@@ -1,3 +1,7 @@
+import openai
+import streamlit as st
+
+openai.api_key = st.secrets["OPENAI_API_KEY"]
 import streamlit as st
 from laudos_ad import redigir_laudo_interface
 import pandas as pd
