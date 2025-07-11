@@ -461,11 +461,13 @@ def show_processos_view(data_iso, local_name):
             row_cols = st.columns([2, 2, 3, 3, 1.5, 2, 2])
             # Ícone 📎 abre seletor de arquivo diretamente, sem botão extra
             with row_cols[0]:
+                st.markdown("<style>section[data-testid='stFileUploader'] div div {display: none;}</style>", unsafe_allow_html=True)
                 uploaded_file = st.file_uploader(
-                    label="",
+                    label="📎",
                     type=["pdf"],
                     label_visibility="collapsed",
-                    key=f"upload_pdf_{key_processos}_{idx}"
+                    key=f"upload_pdf_{key_processos}_{idx}",
+                    accept_multiple_files=False
                 )
                 if uploaded_file:
                     if "arquivos_processos" not in st.session_state:
