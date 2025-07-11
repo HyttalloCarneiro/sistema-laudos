@@ -1,4 +1,5 @@
 import streamlit as st
+from laudos_ad import redigir_laudo_interface
 import pandas as pd
 import calendar
 from datetime import datetime, date
@@ -475,19 +476,22 @@ def show_processos_view(data_iso, local_name):
                     with col_a:
                         if st.button("📝", key=f"laudo_{key_processos}_{idx}"):
                             pass  # A função será implementada posteriormente
+                    # Adiciona o botão "✍️ Redigir Laudo"
+                    if st.button("✍️ Redigir Laudo", key=f"redigir_{idx}"):
+                        st.session_state["dados_laudo"] = {
+                            "nome_autor": processo.get("nome_parte", ""),
+                            "numero_processo": processo.get("numero_processo", ""),
+                            "der": processo.get("der", ""),
+                            "nb": processo.get("nb", ""),
+                            "cpf": processo.get("cpf", ""),
+                            "rg": processo.get("rg", ""),
+                            "nascimento": processo.get("nascimento", ""),
+                            "profissao": processo.get("profissao", "")
+                        }
+                        st.switch_page("laudos_ad.py")
                 else:
                     with col_a:
                         st.write("")  # Ocupa o espaço para manter alinhamento
-
-                with col_b:
-                    if st.button("🚫", key=f"ausente_{key_processos}_{idx}"):
-                        st.session_state.confirm_action = ("ausencia", key_processos, processo)
-                        st.rerun()
-
-                with col_c:
-                    if st.button("🗑️", key=f"excluir_{key_processos}_{idx}"):
-                        st.session_state.confirm_action = ("excluir", key_processos, processo)
-                        st.rerun()
 
         # Opções de edição (mantido se necessário)
         if has_permission(st.session_state.user_info, 'editar_pericias'):
@@ -1150,6 +1154,10 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+# Renderizar interface de laudo se dados estiverem disponíveis
+if "dados_laudo" in st.session_state:
+    redigir_laudo_interface(st.session_state["dados_laudo"])
 
 # Calendário inicial: destaque datas com múltiplos locais
 # Exemplo de código para destacar datas com múltiplos locais
