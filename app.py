@@ -4,6 +4,13 @@ import json
 import os
 import uuid
 
+# Importação do switch_page com tratamento de erro
+try:
+    from streamlit_extras.switch_page_button import switch_page
+except ModuleNotFoundError:
+    switch_page = None
+    st.error("Erro: streamlit-extras não está instalado. Adicione 'streamlit-extras' ao requirements.txt")
+
 # Inicialização
 if "dados" not in st.session_state:
     st.session_state.dados = {}
@@ -46,11 +53,13 @@ else:
             cols[3].markdown(f"**🩺 Tipo:** {processo['tipo']}")
             with cols[4]:
                 if st.button("✍️ Redigir Laudo", key=f"redigir_{processo_id}"):
-                    if processo["tipo"] == "AD":
-                        st.switch_page("laudos_ad.py")
+                    if not switch_page:
+                        st.error("O recurso de navegação entre páginas não está disponível.")
+                    elif processo["tipo"] == "AD":
+                        switch_page("pages/laudos_ad")
                     elif processo["tipo"] == "BPC":
-                        st.switch_page("laudos_bpc.py")
+                        switch_page("pages/laudos_bpc")
                     elif processo["tipo"] == "DPVAT":
-                        st.switch_page("laudos_dpvat.py")
+                        switch_page("pages/laudos_dpvat")
                     else:
                         st.warning("Tipo de processo não reconhecido.")
