@@ -191,39 +191,31 @@ def init_session_data():
                 "permissoes": {}
             }
         }
-    
     if 'pericias' not in st.session_state:
         st.session_state.pericias = {}
-    
     if 'processos' not in st.session_state:
         st.session_state.processos = {}
-    
     if 'locais_estaduais' not in st.session_state:
         st.session_state.locais_estaduais = []
-    
     if 'authenticated' not in st.session_state:
         st.session_state.authenticated = False
-    
     if 'user_info' not in st.session_state:
         st.session_state.user_info = None
-    
     if 'selected_date' not in st.session_state:
         st.session_state.selected_date = None
-    
     if 'show_user_management' not in st.session_state:
         st.session_state.show_user_management = False
-    
     if 'show_change_password' not in st.session_state:
         st.session_state.show_change_password = False
-    
     if 'current_local_filter' not in st.session_state:
         st.session_state.current_local_filter = None
-    
     if 'show_estaduais_management' not in st.session_state:
         st.session_state.show_estaduais_management = False
-    
     if 'selected_date_local' not in st.session_state:
         st.session_state.selected_date_local = None
+    # --- Adicionado: inicializar data_selecionada ---
+    if "data_selecionada" not in st.session_state:
+        st.session_state.data_selecionada = None
 
 def authenticate_user(username, password):
     """Autentica usuário"""
@@ -249,14 +241,14 @@ def create_calendar_view(year, month):
     """Cria visualização do calendário em português"""
     cal = calendar.monthcalendar(year, month)
     month_name = MESES_PT[month]
-    
+
     st.subheader(f"📅 {month_name} {year}")
-    
+
     # Cabeçalho dos dias da semana em português
     cols = st.columns(7)
     for i, day in enumerate(DIAS_SEMANA_PT):
         cols[i].markdown(f"**{day}**")
-    
+
     # Dias do mês
     for week in cal:
         cols = st.columns(7)
@@ -265,38 +257,44 @@ def create_calendar_view(year, month):
                 cols[i].write("")
             else:
                 date_str = f"{year}-{month:02d}-{day:02d}"
-                
+
                 # Verificar se há perícias neste dia
                 pericias_do_dia = []
+                locais_do_dia = []
                 for chave, info in st.session_state.pericias.items():
                     if '_' in chave:
                         data_chave = chave.split('_')[0]
                     else:
                         data_chave = chave
-                    
                     if data_chave == date_str:
                         pericias_do_dia.append(info['local'])
-                
+                        locais_do_dia.append(info['local'])
+
                 if pericias_do_dia:
                     # Mostrar quantas perícias há no dia
                     num_pericias = len(pericias_do_dia)
                     if num_pericias == 1:
                         local_short = pericias_do_dia[0].split('(')[0].strip()[:10]
-                        cols[i].button(
+                        if cols[i].button(
                             f"**{day}**\n📍 {local_short}",
                             key=f"day_{date_str}",
                             help=f"Perícia em: {pericias_do_dia[0]}",
                             type="primary",
                             use_container_width=True
-                        )
+                        ):
+                            # Ao clicar, definir data_selecionada e redirecionar para gerenciar_pericias.py
+                            st.session_state.data_selecionada = date_str
+                            st.switch_page("pages/gerenciar_pericias.py")
                     else:
-                        cols[i].button(
+                        if cols[i].button(
                             f"**{day}**\n📍 {num_pericias} locais",
                             key=f"day_{date_str}",
                             help=f"Perícias em: {', '.join(pericias_do_dia)}",
                             type="primary",
                             use_container_width=True
-                        )
+                        ):
+                            st.session_state.data_selecionada = date_str
+                            st.switch_page("pages/gerenciar_pericias.py")
                 else:
                     if cols[i].button(f"{day}", key=f"day_{date_str}", use_container_width=True):
                         st.session_state.selected_date = date_str
