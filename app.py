@@ -282,9 +282,8 @@ def create_calendar_view(year, month):
                             type="primary",
                             use_container_width=True
                         ):
-                            # Ao clicar, definir data_selecionada e redirecionar para gerenciar_pericias.py
-                            st.session_state.data_selecionada = date_str
-                            st.switch_page("pages/gerenciar_pericias.py")
+                            # Corrigido: definir página específica de processos da data
+                            st.session_state['pagina'] = f"processos_{datetime.strptime(date_str, '%Y-%m-%d').strftime('%d-%m-%Y')}"
                     else:
                         if cols[i].button(
                             f"**{day}**\n📍 {num_pericias} locais",
@@ -293,8 +292,7 @@ def create_calendar_view(year, month):
                             type="primary",
                             use_container_width=True
                         ):
-                            st.session_state.data_selecionada = date_str
-                            st.switch_page("pages/gerenciar_pericias.py")
+                            st.session_state['pagina'] = f"processos_{datetime.strptime(date_str, '%Y-%m-%d').strftime('%d-%m-%Y')}"
                 else:
                     if cols[i].button(f"{day}", key=f"day_{date_str}", use_container_width=True):
                         st.session_state.selected_date = date_str
@@ -977,255 +975,293 @@ def main():
             show_local_specific_view(st.session_state.current_local_filter)
         
         else:
-            # Interface principal - calendário
-            tab1, tab2 = st.tabs(["📅 Calendário e Perícias", "📋 Gerenciar Perícias"])
-            
-            with tab1:
-                # Verificar permissão para visualizar calendário
-                if not has_permission(user_info, 'visualizar_calendario'):
-                    st.error("❌ Você não tem permissão para visualizar o calendário.")
+            # Se a página for do tipo processos_xx-xx-xxxx, exibe a lista de processos daquele dia
+            pagina = st.session_state.get('pagina', None)
+            if pagina and isinstance(pagina, str) and pagina.startswith("processos_"):
+                # Extrai a data da página
+                data_str = pagina.replace("processos_", "")
+                try:
+                    data = datetime.strptime(data_str, "%d-%m-%Y")
+                except Exception as e:
+                    st.error(f"Data inválida: {data_str}")
                     return
+                st.markdown(f"## 📋 Processos - {data.strftime('%d/%m/%Y')}")
+                # Permitir seleção do local
+                locais_disponiveis = []
+                for chave, info in st.session_state.pericias.items():
+                    if '_' in chave:
+                        data_chave = chave.split('_')[0]
+                        local_chave = chave[len(data_chave) + 1 :]
+                    else:
+                        data_chave = chave
+                        local_chave = info['local']
+                    if data_chave == data.strftime('%Y-%m-%d'):
+                        locais_disponiveis.append(info['local'])
+                locais_disponiveis = sorted(list(set(locais_disponiveis)))
+                if not locais_disponiveis:
+                    st.info("Nenhuma perícia agendada para este dia.")
+                    if st.button("← Voltar para o calendário"):
+                        st.session_state['pagina'] = None
+                        st.rerun()
+                    return
+                local_selecionado = st.selectbox("Selecione o local", locais_disponiveis, key="local_proc_dia")
+                # Exibe processos da data e local
+                key_processos = f"{data.strftime('%Y-%m-%d')}_{local_selecionado}"
+                show_processos_view(data.strftime('%Y-%m-%d'), local_selecionado)
+                # Botão para voltar ao calendário
+                if st.button("← Voltar para o calendário"):
+                    st.session_state['pagina'] = None
+                    st.rerun()
+            else:
+                # Interface principal - calendário
+                tab1, tab2 = st.tabs(["📅 Calendário e Perícias", "📋 Gerenciar Perícias"])
                 
-                # Calendário
-                col1, col2 = st.columns([2, 1])
-                
-                with col2:
-                    st.markdown("### 🗓️ Navegação")
-                    today = datetime.now()
-                    selected_month = st.selectbox(
-                        "Mês",
-                        range(1, 13),
-                        index=today.month - 1,
-                        format_func=lambda x: MESES_PT[x]
-                    )
-                    selected_year = st.selectbox(
-                        "Ano",
-                        range(today.year - 1, today.year + 3),
-                        index=1
-                    )
-                
-                with col1:
-                    create_calendar_view(selected_year, selected_month)
-                
-                # Formulário para adicionar perícia na data selecionada
-                if st.session_state.selected_date and has_permission(user_info, 'agendar_pericias'):
-                    st.markdown("---")
-                    date_formatted = format_date_br(st.session_state.selected_date)
-                    st.markdown(f"### 📝 Agendar Perícia - {date_formatted}")
+                with tab1:
+                    # Verificar permissão para visualizar calendário
+                    if not has_permission(user_info, 'visualizar_calendario'):
+                        st.error("❌ Você não tem permissão para visualizar o calendário.")
+                        return
                     
-                    # Verificar se já há perícias nesta data
-                    pericias_existentes = []
-                    for chave, info in st.session_state.pericias.items():
-                        if '_' in chave:
-                            data_chave = chave.split('_')[0]
+                    # Calendário
+                    col1, col2 = st.columns([2, 1])
+                    
+                    with col2:
+                        st.markdown("### 🗓️ Navegação")
+                        today = datetime.now()
+                        selected_month = st.selectbox(
+                            "Mês",
+                            range(1, 13),
+                            index=today.month - 1,
+                            format_func=lambda x: MESES_PT[x]
+                        )
+                        selected_year = st.selectbox(
+                            "Ano",
+                            range(today.year - 1, today.year + 3),
+                            index=1
+                        )
+                    
+                    with col1:
+                        create_calendar_view(selected_year, selected_month)
+                    
+                    # Formulário para adicionar perícia na data selecionada
+                    if st.session_state.selected_date and has_permission(user_info, 'agendar_pericias'):
+                        st.markdown("---")
+                        date_formatted = format_date_br(st.session_state.selected_date)
+                        st.markdown(f"### 📝 Agendar Perícia - {date_formatted}")
+                        
+                        # Verificar se já há perícias nesta data
+                        pericias_existentes = []
+                        for chave, info in st.session_state.pericias.items():
+                            if '_' in chave:
+                                data_chave = chave.split('_')[0]
+                            else:
+                                data_chave = chave
+                            
+                            if data_chave == st.session_state.selected_date:
+                                pericias_existentes.append(info['local'])
+                        
+                        if pericias_existentes:
+                            st.info(f"📍 Já há perícias agendadas nesta data em: {', '.join(pericias_existentes)}")
+                        
+                        with st.form("add_pericia"):
+                            # Apenas local e observações, sem horário
+                            local_pericia = st.selectbox("Local da Perícia", get_all_locais())
+                            observacoes = st.text_area("Observações (opcional)")
+                            
+                            col1, col2 = st.columns(2)
+                            with col1:
+                                if st.form_submit_button("✅ Confirmar Perícia", type="primary"):
+                                    # Verificar se já existe perícia neste local/data
+                                    ja_existe = False
+                                    for chave, info in st.session_state.pericias.items():
+                                        if '_' in chave:
+                                            data_chave = chave.split('_')[0]
+                                        else:
+                                            data_chave = chave
+                                        
+                                        if data_chave == st.session_state.selected_date and info['local'] == local_pericia:
+                                            ja_existe = True
+                                            break
+                                    
+                                    if not ja_existe:
+                                        # Criar chave única para cada perícia
+                                        chave_pericia = f"{st.session_state.selected_date}_{local_pericia}"
+                                        st.session_state.pericias[chave_pericia] = {
+                                            "local": local_pericia,
+                                            "observacoes": observacoes,
+                                            "criado_por": st.session_state.username,
+                                            "criado_em": datetime.now().isoformat()
+                                        }
+                                        st.success("✅ Perícia agendada com sucesso!")
+                                        st.session_state.selected_date = None
+                                        st.rerun()
+                                    else:
+                                        st.error(f"❌ Já existe uma perícia agendada para {local_pericia} nesta data!")
+                            
+                            with col2:
+                                if st.form_submit_button("❌ Cancelar"):
+                                    st.session_state.selected_date = None
+                                    st.rerun()
+                    
+                    # Locais de atuação (mantido para compatibilidade)
+                    if has_permission(user_info, 'visualizar_locais'):
+                        st.markdown("---")
+                        st.markdown("### 🏛️ Acesso Rápido aos Locais")
+                        
+                        # Federais
+                        st.markdown("#### ⚖️ Federais")
+                        cols = st.columns(3)
+                        for i, local in enumerate(LOCAIS_FEDERAIS):
+                            with cols[i % 3]:
+                                if st.button(f"📍 {local.split('(')[0].strip()}", key=f"quick_{local}", use_container_width=True):
+                                    st.session_state.current_local_filter = local
+                                    st.rerun()
+                        
+                        # Estaduais
+                        locais_estaduais_ordenados = sorted(st.session_state.locais_estaduais)
+                        if locais_estaduais_ordenados:
+                            st.markdown("#### 🏛️ Estaduais")
+                            cols = st.columns(3)
+                            for i, local in enumerate(locais_estaduais_ordenados):
+                                with cols[i % 3]:
+                                    if st.button(f"📍 {local}", key=f"quick_estadual_{local}", use_container_width=True):
+                                        st.session_state.current_local_filter = local
+                                        st.rerun()
+                
+                with tab2:
+                    # Verificar permissão para visualizar todas as perícias
+                    if not has_permission(user_info, 'visualizar_todas_pericias'):
+                        st.error("❌ Você não tem permissão para visualizar todas as perícias.")
+                        return
+                    
+                    st.markdown("### 📋 Gerenciar Todas as Perícias")
+                    
+                    if st.session_state.pericias:
+                        # Converter para DataFrame
+                        pericias_list = []
+                        for chave, info in st.session_state.pericias.items():
+                            # Extrair data da chave
+                            if '_' in chave:
+                                data = chave.split('_')[0]
+                            else:
+                                data = chave
+                            
+                            pericias_list.append({
+                                'Data': format_date_br(data),
+                                'Local': info['local'],
+                                'Observações': info.get('observacoes', ''),
+                                'Criado por': info.get('criado_por', 'N/A')
+                            })
+                        
+                        df = pd.DataFrame(pericias_list)
+                        # Ordenar por data
+                        df['Data_Sort'] = df['Data'].apply(format_date_iso)
+                        df = df.sort_values('Data_Sort', ascending=False).drop('Data_Sort', axis=1)
+                        
+                        # Filtros (se permitido)
+                        if has_permission(user_info, 'filtrar_pericias'):
+                            col1, col2 = st.columns(2)
+                            with col1:
+                                filtro_local_geral = st.selectbox(
+                                    "Filtrar por local",
+                                    ["Todos"] + get_all_locais(),
+                                    key="filtro_geral"
+                                )
+                            
+                            with col2:
+                                filtro_data = st.date_input("Filtrar a partir da data")
+                            
+                            # Aplicar filtros
+                            df_filtrado = df.copy()
+                            if filtro_local_geral != "Todos":
+                                df_filtrado = df_filtrado[df_filtrado['Local'] == filtro_local_geral]
+                            
+                            if filtro_data:
+                                filtro_data_str = filtro_data.strftime("%d-%m-%Y")
+                                df_filtrado['Data_Compare'] = df_filtrado['Data'].apply(format_date_iso)
+                                filtro_data_iso = format_date_iso(filtro_data_str)
+                                df_filtrado = df_filtrado[df_filtrado['Data_Compare'] >= filtro_data_iso]
+                                df_filtrado = df_filtrado.drop('Data_Compare', axis=1)
+                            
+                            st.dataframe(df_filtrado, use_container_width=True)
                         else:
-                            data_chave = chave
+                            st.dataframe(df, use_container_width=True)
                         
-                        if data_chave == st.session_state.selected_date:
-                            pericias_existentes.append(info['local'])
-                    
-                    if pericias_existentes:
-                        st.info(f"📍 Já há perícias agendadas nesta data em: {', '.join(pericias_existentes)}")
-                    
-                    with st.form("add_pericia"):
-                        # Apenas local e observações, sem horário
-                        local_pericia = st.selectbox("Local da Perícia", get_all_locais())
-                        observacoes = st.text_area("Observações (opcional)")
-                        
-                        col1, col2 = st.columns(2)
-                        with col1:
-                            if st.form_submit_button("✅ Confirmar Perícia", type="primary"):
-                                # Verificar se já existe perícia neste local/data
-                                ja_existe = False
+                        # Opção para deletar perícias (apenas se permitido)
+                        if has_permission(user_info, 'deletar_pericias'):
+                            st.markdown("#### 🗑️ Remover Perícia")
+                            
+                            # Criar lista de opções com datas formatadas
+                            opcoes_remover = [""]
+                            for chave in st.session_state.pericias.keys():
+                                if '_' in chave:
+                                    data = chave.split('_')[0]
+                                else:
+                                    data = chave
+                                
+                                data_br = format_date_br(data)
+                                local = st.session_state.pericias[chave]['local']
+                                opcoes_remover.append(f"{data_br} - {local}")
+                            
+                            data_remover_display = st.selectbox(
+                                "Selecione a perícia para remover",
+                                opcoes_remover
+                            )
+                            
+                            if data_remover_display and st.button("🗑️ Confirmar Remoção", type="secondary"):
+                                # Extrair a data e local da opção selecionada
+                                data_br, local = data_remover_display.split(' - ', 1)
+                                data_iso = format_date_iso(data_br)
+                                
+                                # Encontrar a chave correta
+                                chave_para_remover = None
                                 for chave, info in st.session_state.pericias.items():
                                     if '_' in chave:
                                         data_chave = chave.split('_')[0]
                                     else:
                                         data_chave = chave
                                     
-                                    if data_chave == st.session_state.selected_date and info['local'] == local_pericia:
-                                        ja_existe = True
+                                    if data_chave == data_iso and info['local'] == local:
+                                        chave_para_remover = chave
                                         break
                                 
-                                if not ja_existe:
-                                    # Criar chave única para cada perícia
-                                    chave_pericia = f"{st.session_state.selected_date}_{local_pericia}"
-                                    st.session_state.pericias[chave_pericia] = {
-                                        "local": local_pericia,
-                                        "observacoes": observacoes,
-                                        "criado_por": st.session_state.username,
-                                        "criado_em": datetime.now().isoformat()
-                                    }
-                                    st.success("✅ Perícia agendada com sucesso!")
-                                    st.session_state.selected_date = None
+                                if chave_para_remover:
+                                    del st.session_state.pericias[chave_para_remover]
+                                    # Também remover processos associados se existirem
+                                    key_processos = f"{data_iso}_{local}"
+                                    if key_processos in st.session_state.processos:
+                                        del st.session_state.processos[key_processos]
+                                    st.success("✅ Perícia removida com sucesso!")
                                     st.rerun()
-                                else:
-                                    st.error(f"❌ Já existe uma perícia agendada para {local_pericia} nesta data!")
-                        
-                        with col2:
-                            if st.form_submit_button("❌ Cancelar"):
-                                st.session_state.selected_date = None
-                                st.rerun()
-                
-                # Locais de atuação (mantido para compatibilidade)
-                if has_permission(user_info, 'visualizar_locais'):
-                    st.markdown("---")
-                    st.markdown("### 🏛️ Acesso Rápido aos Locais")
-                    
-                    # Federais
-                    st.markdown("#### ⚖️ Federais")
-                    cols = st.columns(3)
-                    for i, local in enumerate(LOCAIS_FEDERAIS):
-                        with cols[i % 3]:
-                            if st.button(f"📍 {local.split('(')[0].strip()}", key=f"quick_{local}", use_container_width=True):
-                                st.session_state.current_local_filter = local
-                                st.rerun()
-                    
-                    # Estaduais
-                    locais_estaduais_ordenados = sorted(st.session_state.locais_estaduais)
-                    if locais_estaduais_ordenados:
-                        st.markdown("#### 🏛️ Estaduais")
-                        cols = st.columns(3)
-                        for i, local in enumerate(locais_estaduais_ordenados):
-                            with cols[i % 3]:
-                                if st.button(f"📍 {local}", key=f"quick_estadual_{local}", use_container_width=True):
-                                    st.session_state.current_local_filter = local
-                                    st.rerun()
-            
-            with tab2:
-                # Verificar permissão para visualizar todas as perícias
-                if not has_permission(user_info, 'visualizar_todas_pericias'):
-                    st.error("❌ Você não tem permissão para visualizar todas as perícias.")
-                    return
-                
-                st.markdown("### 📋 Gerenciar Todas as Perícias")
-                
-                if st.session_state.pericias:
-                    # Converter para DataFrame
-                    pericias_list = []
-                    for chave, info in st.session_state.pericias.items():
-                        # Extrair data da chave
-                        if '_' in chave:
-                            data = chave.split('_')[0]
-                        else:
-                            data = chave
-                        
-                        pericias_list.append({
-                            'Data': format_date_br(data),
-                            'Local': info['local'],
-                            'Observações': info.get('observacoes', ''),
-                            'Criado por': info.get('criado_por', 'N/A')
-                        })
-                    
-                    df = pd.DataFrame(pericias_list)
-                    # Ordenar por data
-                    df['Data_Sort'] = df['Data'].apply(format_date_iso)
-                    df = df.sort_values('Data_Sort', ascending=False).drop('Data_Sort', axis=1)
-                    
-                    # Filtros (se permitido)
-                    if has_permission(user_info, 'filtrar_pericias'):
-                        col1, col2 = st.columns(2)
-                        with col1:
-                            filtro_local_geral = st.selectbox(
-                                "Filtrar por local",
-                                ["Todos"] + get_all_locais(),
-                                key="filtro_geral"
-                            )
-                        
-                        with col2:
-                            filtro_data = st.date_input("Filtrar a partir da data")
-                        
-                        # Aplicar filtros
-                        df_filtrado = df.copy()
-                        if filtro_local_geral != "Todos":
-                            df_filtrado = df_filtrado[df_filtrado['Local'] == filtro_local_geral]
-                        
-                        if filtro_data:
-                            filtro_data_str = filtro_data.strftime("%d-%m-%Y")
-                            df_filtrado['Data_Compare'] = df_filtrado['Data'].apply(format_date_iso)
-                            filtro_data_iso = format_date_iso(filtro_data_str)
-                            df_filtrado = df_filtrado[df_filtrado['Data_Compare'] >= filtro_data_iso]
-                            df_filtrado = df_filtrado.drop('Data_Compare', axis=1)
-                        
-                        st.dataframe(df_filtrado, use_container_width=True)
                     else:
-                        st.dataframe(df, use_container_width=True)
-                    
-                    # Opção para deletar perícias (apenas se permitido)
-                    if has_permission(user_info, 'deletar_pericias'):
-                        st.markdown("#### 🗑️ Remover Perícia")
-                        
-                        # Criar lista de opções com datas formatadas
-                        opcoes_remover = [""]
-                        for chave in st.session_state.pericias.keys():
-                            if '_' in chave:
-                                data = chave.split('_')[0]
-                            else:
-                                data = chave
-                            
-                            data_br = format_date_br(data)
-                            local = st.session_state.pericias[chave]['local']
-                            opcoes_remover.append(f"{data_br} - {local}")
-                        
-                        data_remover_display = st.selectbox(
-                            "Selecione a perícia para remover",
-                            opcoes_remover
-                        )
-                        
-                        if data_remover_display and st.button("🗑️ Confirmar Remoção", type="secondary"):
-                            # Extrair a data e local da opção selecionada
-                            data_br, local = data_remover_display.split(' - ', 1)
-                            data_iso = format_date_iso(data_br)
-                            
-                            # Encontrar a chave correta
-                            chave_para_remover = None
-                            for chave, info in st.session_state.pericias.items():
-                                if '_' in chave:
-                                    data_chave = chave.split('_')[0]
-                                else:
-                                    data_chave = chave
-                                
-                                if data_chave == data_iso and info['local'] == local:
-                                    chave_para_remover = chave
-                                    break
-                            
-                            if chave_para_remover:
-                                del st.session_state.pericias[chave_para_remover]
-                                # Também remover processos associados se existirem
-                                key_processos = f"{data_iso}_{local}"
-                                if key_processos in st.session_state.processos:
-                                    del st.session_state.processos[key_processos]
-                                st.success("✅ Perícia removida com sucesso!")
-                                st.rerun()
-                else:
-                    st.info("📭 Nenhuma perícia agendada ainda.")
+                        st.info("📭 Nenhuma perícia agendada ainda.")
 
-            # --- NOVO EXPANDER: Anexar Processos em Lote ---
-            import uuid
-            with st.expander("📤 Anexar Processos em Lote"):
-                # Inicializa dicionário de dados se não existir
-                if "dados" not in st.session_state:
-                    st.session_state.dados = {}
-                arquivos = st.file_uploader("Selecionar arquivos PDF", type="pdf", accept_multiple_files=True, key="lote")
+                # --- NOVO EXPANDER: Anexar Processos em Lote ---
+                import uuid
+                with st.expander("📤 Anexar Processos em Lote"):
+                    # Inicializa dicionário de dados se não existir
+                    if "dados" not in st.session_state:
+                        st.session_state.dados = {}
+                    arquivos = st.file_uploader("Selecionar arquivos PDF", type="pdf", accept_multiple_files=True, key="lote")
 
-                if arquivos:
-                    for arquivo in arquivos:
-                        with pdfplumber.open(arquivo) as pdf:
-                            texto = ""
-                            for pagina in pdf.pages:
-                                pagina_texto = pagina.extract_text()
-                                if pagina_texto:
-                                    texto += pagina_texto + "\n"
+                    if arquivos:
+                        for arquivo in arquivos:
+                            with pdfplumber.open(arquivo) as pdf:
+                                texto = ""
+                                for pagina in pdf.pages:
+                                    pagina_texto = pagina.extract_text()
+                                    if pagina_texto:
+                                        texto += pagina_texto + "\n"
 
-                        st.session_state.dados[str(uuid.uuid4())] = {
-                            "nome": f"Autor {len(st.session_state.dados)+1}",
-                            "numero": f"Nº {len(st.session_state.dados)+1}",
-                            "tipo": st.selectbox("Tipo", ["AD", "BPC", "DPVAT"], key=arquivo.name),
-                            "horario": "09:00",
-                            "conteudo": texto,
-                            "situacao": "Pré-laudo"
-                        }
-                    st.success("Processos em lote anexados com sucesso!")
+                            st.session_state.dados[str(uuid.uuid4())] = {
+                                "nome": f"Autor {len(st.session_state.dados)+1}",
+                                "numero": f"Nº {len(st.session_state.dados)+1}",
+                                "tipo": st.selectbox("Tipo", ["AD", "BPC", "DPVAT"], key=arquivo.name),
+                                "horario": "09:00",
+                                "conteudo": texto,
+                                "situacao": "Pré-laudo"
+                            }
+                        st.success("Processos em lote anexados com sucesso!")
 
 
 # --- FINAL DO ARQUIVO: Geração de Pré-Laudos em Lote ---
