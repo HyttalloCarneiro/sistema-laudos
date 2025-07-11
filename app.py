@@ -1,59 +1,65 @@
 
 import streamlit as st
-import json
-import os
-import uuid
+from datetime import datetime
 from streamlit_extras.switch_page_button import switch_page
+from streamlit.source_util import get_pages
 
-# Inicialização
-if "dados" not in st.session_state:
-    st.session_state.dados = {}
+# Função para inicializar variáveis de sessão
+def inicializar_sessao():
+    if "processos" not in st.session_state:
+        st.session_state.processos = []
+    if "editar" not in st.session_state:
+        st.session_state.editar = None
 
-st.title("📋 Sistema de Laudos Periciais")
+# Função para adicionar processo
+def adicionar_processo(nome, numero, tipo, horario):
+    st.session_state.processos.append({
+        "nome": nome,
+        "numero": numero,
+        "tipo": tipo,
+        "horario": horario,
+        "status": "Pré-laudo"
+    })
 
-# Layout principal
-st.markdown("## ➕ Adicionar Processo")
+# Função principal da interface
+def main():
+    st.title("🗂️ Sistema de Laudos Periciais")
 
-with st.form("adicionar_processo"):
-    nome = st.text_input("Nome do periciando")
-    numero = st.text_input("Número do Processo")
-    tipo = st.selectbox("Tipo", ["AD", "BPC", "DPVAT"])
-    horario = st.time_input("Horário", value=None)
-    st.markdown("---")
-    submitted = st.form_submit_button("✅ Adicionar Processo")
+    inicializar_sessao()
 
-    if submitted and nome and numero:
-        novo_id = str(uuid.uuid4())
-        st.session_state.dados[novo_id] = {
-            "nome": nome,
-            "numero": numero,
-            "tipo": tipo,
-            "horario": horario.strftime("%H:%M") if horario else "09:00",
-            "situacao": "Pré-laudo"
-        }
-        st.success("Processo adicionado com sucesso!")
+    st.header("➕ Adicionar Processo")
+    with st.form("form_processo"):
+        nome = st.text_input("Nome do periciando")
+        numero = st.text_input("Número do Processo")
+        tipo = st.selectbox("Tipo", ["AD", "BPC", "DPVAT"])
+        horario = st.time_input("Horário", value=datetime.strptime("09:00", "%H:%M").time())
+        submitted = st.form_submit_button("Adicionar Processo")
+        if submitted and nome and numero:
+            adicionar_processo(nome, numero, tipo, horario)
 
-# Lista de processos cadastrados
-st.markdown("## 📋 Processos Cadastrados")
-if not st.session_state.dados:
-    st.info("Nenhum processo cadastrado.")
-else:
-    for processo_id, processo in st.session_state.dados.items():
-        with st.container():
-            cols = st.columns([2, 2, 2, 1, 2])
-            cols[0].markdown(f"**🕒 Horário:** {processo['horario']}")
-            cols[1].markdown(f"**📄 Processo:** {processo['numero']}")
-            cols[2].markdown(f"**👤 Nome:** {processo['nome']}")
-            cols[3].markdown(f"**🩺 Tipo:** {processo['tipo']}")
-            with cols[4]:
-                if st.button("✍️ Redigir Laudo", key=f"redigir_{processo_id}"):
-                    if not switch_page:
-                        st.error("O recurso de navegação entre páginas não está disponível.")
-                    elif processo["tipo"] == "AD":
-                        switch_page("pages/laudos_ad")
-                    elif processo["tipo"] == "BPC":
-                        switch_page("pages/laudos_bpc")
-                    elif processo["tipo"] == "DPVAT":
-                        switch_page("pages/laudos_dpvat")
-                    else:
-                        st.warning("Tipo de processo não reconhecido.")
+    st.header("📋 Processos Cadastrados")
+    if st.session_state.processos:
+        for i, proc in enumerate(st.session_state.processos):
+            col1, col2, col3, col4, col5 = st.columns([2, 2, 2, 2, 1])
+            col1.markdown(f"🕘 **Horário:** {proc['horario'].strftime('%H:%M')}")
+            col2.markdown(f"📁 **Processo:** {proc['numero']}")
+            col3.markdown(f"👤 **Nome:** {proc['nome']}")
+            col4.markdown(f"⚖️ **Tipo:** {proc['tipo']}")
+            if col5.button("✍️ Redigir Laudo", key=f"editar_{i}"):
+                st.session_state.editar = i
+                tipo = proc["tipo"]
+                nome_da_pagina = {
+                    "AD": "laudos_ad",
+                    "BPC": "laudos_bpc",
+                    "DPVAT": "laudos_dpvat"
+                }.get(tipo)
+                paginas = get_pages("app.py")
+                for chave, pagina in paginas.items():
+                    if nome_da_pagina in pagina["page_name"]:
+                        switch_page(pagina["page_name"])
+                        break
+    else:
+        st.info("Nenhum processo cadastrado.")
+
+if __name__ == "__main__":
+    main()
