@@ -482,7 +482,7 @@ def show_processos_view(data_iso, local_name):
                     # Adiciona o botão "✍️ Redigir Laudo"
                     if st.button("✍️ Redigir Laudo", key=f"redigir_{idx}"):
                         st.session_state["dados_laudo"] = processo
-                        st.switch_page("pages/laudos_ad.py")
+                        st.switch_page("laudos_ad.py")
                 else:
                     with col_a:
                         st.write("")  # Ocupa o espaço para manter alinhamento
