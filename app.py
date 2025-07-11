@@ -3,13 +3,7 @@ import streamlit as st
 import json
 import os
 import uuid
-
-# Importação do switch_page com tratamento de erro
-try:
-    from streamlit_extras.switch_page_button import switch_page
-except ModuleNotFoundError:
-    switch_page = None
-    st.error("Erro: streamlit-extras não está instalado. Adicione 'streamlit-extras' ao requirements.txt")
+from streamlit_extras.switch_page_button import switch_page
 
 # Inicialização
 if "dados" not in st.session_state:
