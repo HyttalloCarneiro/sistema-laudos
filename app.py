@@ -1,4 +1,5 @@
 import streamlit as st
+import fitz  # PyMuPDF
 import pandas as pd
 import calendar
 from datetime import datetime, date
@@ -298,6 +299,13 @@ def show_local_specific_view(local_name):
         datas_unicas.add(p['Data_Sort'])
     st.metric("Total de Dias com Perícias", len(datas_unicas))
 
+def extrair_texto_pdf(uploaded_file):
+    texto = ""
+    with fitz.open(stream=uploaded_file.read(), filetype="pdf") as doc:
+        for pagina in doc:
+            texto += pagina.get_text()
+    return texto
+
 def show_processos_view(data_iso, local_name):
     """Mostra a tela de gerenciamento de processos para uma data/local específico"""
     data_br = format_date_br(data_iso)
@@ -578,7 +586,18 @@ def show_processos_view(data_iso, local_name):
         # Bloco: Ações em Lote
         st.markdown("### 🧾 Ações em Lote")
         if st.button("🛠️ Gerar Lote de Pré-Laudos"):
-            st.info("🚧 Função em desenvolvimento: geração de lote será implantada em breve.")
+            st.info("⏳ Iniciando leitura dos processos...")
+
+            for idx, processo in enumerate(processos_ordenados):
+                chave_pdf = f"pdf_{key_processos}_{idx}"
+                chave_texto = f"text_{key_processos}_{idx}"
+
+                if chave_pdf in st.session_state:
+                    arquivo_pdf = st.session_state[chave_pdf]
+                    texto_extraido = extrair_texto_pdf(arquivo_pdf)
+                    st.session_state[chave_texto] = texto_extraido
+
+            st.success("✅ Leitura de todos os PDFs concluída com sucesso!")
 
     else:
         st.info("📭 Nenhum processo cadastrado para esta data/local ainda.")
