@@ -2,6 +2,10 @@ import sys
 import os
 sys.path.append(os.path.join(os.path.dirname(__file__), "pages"))
 
+import sys
+import os
+
+sys.path.append(os.path.join(os.path.dirname(__file__), 'pages'))
 import streamlit as st
 import fitz  # PyMuPDF
 import pandas as pd
@@ -11,7 +15,7 @@ import json
 import locale
 
 # Ajuste dos imports dos módulos das páginas
-from pages.laudos_ad import redigir_laudo_interface
+from laudos_ad import redigir_laudo_interface
 
 # Configuração da página
 st.set_page_config(
