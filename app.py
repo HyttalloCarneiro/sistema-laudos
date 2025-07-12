@@ -473,10 +473,13 @@ def show_processos_view(data_iso, local_name):
                         if uploaded_file:
                             st.session_state[f"uploaded_{key_processos}_{idx}"] = True
                             st.session_state[f"pdf_{key_processos}_{idx}"] = uploaded_file
-                            st.success("✅ Arquivo carregado com sucesso!")
+                            st.session_state[f"upload_success_{key_processos}_{idx}"] = True
                             st.experimental_rerun()
                 else:
                     st.button("📄 Pronto", key=f"uploaded_btn_{key_processos}_{idx}", disabled=True)
+                    if st.session_state.get(f"upload_success_{key_processos}_{idx}"):
+                        st.success("✅ Arquivo carregado com sucesso!")
+                        st.session_state[f"upload_success_{key_processos}_{idx}"] = False
             row_cols[1].write(processo['horario'])
             row_cols[2].write(processo['numero_processo'])
             row_cols[3].write(processo['nome_parte'])
