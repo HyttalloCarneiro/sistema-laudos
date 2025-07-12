@@ -4,17 +4,17 @@ import streamlit as st
 openai.api_key = st.secrets["OPENAI_API_KEY"]
 import streamlit as st
 
-def redigir_laudo_interface(dados):
+def redigir_laudo_interface():
     st.title("📝 Redigir Laudo de Auxílio-Doença")
 
-    nome = dados.get("nome_autor", "")
-    processo = dados.get("numero_processo", "")
-    der = dados.get("der", "")
-    nb = dados.get("nb", "")
-    cpf = dados.get("cpf", "")
-    rg = dados.get("rg", "")
-    nascimento = dados.get("nascimento", "")
-    profissao = dados.get("profissao", "")
+    nome = ""
+    processo = ""
+    der = ""
+    nb = ""
+    cpf = ""
+    rg = ""
+    nascimento = ""
+    profissao = ""
 
     st.markdown("### Dados do Processo")
     st.text_input("Nome do Autor", value=nome, disabled=True)
