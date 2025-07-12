@@ -472,6 +472,7 @@ def show_processos_view(data_iso, local_name):
                         uploaded_file = st.file_uploader("Selecionar PDF", type=["pdf"], key=f"file_uploader_{key_processos}_{idx}")
                         if uploaded_file:
                             st.session_state[f"uploaded_{key_processos}_{idx}"] = True
+                            st.session_state[f"pdf_{key_processos}_{idx}"] = uploaded_file
                             st.success("✅ Arquivo carregado com sucesso!")
                             st.experimental_rerun()
                 else:
