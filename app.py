@@ -14,7 +14,7 @@ import json
 import locale
 
 # Ajuste dos imports dos módulos das páginas
-from laudos_ad import redigir_laudo_ad
+from pages.laudos_ad import redigir_laudo_ad
 
 # Configuração da página
 st.set_page_config(
