@@ -6,14 +6,11 @@ from datetime import datetime, date
 import json
 import locale
 
-# Bloco para garantir que a pasta raiz está no sys.path (antes do import do redigir_laudo_ad)
-import sys
+# Bloco para garantir que a pasta 'pages' está no sys.path (antes do import do redigir_laudo_ad)
 import os
+import sys
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), 'pages')))
 
-# Garante que a pasta raiz seja incluída no sys.path para reconhecer a pasta 'pages' como pacote
-sys.path.append(os.path.abspath(os.path.dirname(__file__)))
-
-# Importação do redigir_laudo_ad do módulo de laudo AD
 from laudos_ad import redigir_laudo_ad
 
 # Configuração da página
