@@ -11,7 +11,7 @@ import json
 import locale
 
 # Ajuste dos imports dos módulos das páginas
-from pages.laudos_ad import gerar_laudo_ad
+from pages.laudos_ad import redigir_laudo_interface
 
 # Configuração da página
 st.set_page_config(
@@ -578,7 +578,7 @@ def show_processos_view(data_iso, local_name):
             import tempfile
             import os
             from utils import extrair_texto_pdf
-            from pages.laudos_ad import gerar_laudos_ad
+            from pages.laudos_ad import redigir_laudo_interface
             try:
                 from laudos_bpc import gerar_laudo_bpc
             except ImportError:
@@ -603,7 +603,7 @@ def show_processos_view(data_iso, local_name):
                     # Gera laudo conforme tipo
                     tipo_raw = processo.get("tipo", "")
                     if "AD" in tipo_raw:
-                        laudo = gerar_laudo_ad(texto_extraido)
+                        laudo = redigir_laudo_interface(texto_extraido)
                     elif "BPC" in tipo_raw:
                         laudo = gerar_laudo_bpc(texto_extraido)
                     else:
