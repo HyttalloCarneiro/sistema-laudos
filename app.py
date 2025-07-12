@@ -388,6 +388,9 @@ def show_processos_view(data_iso, local_name):
                 tipo_pericia = st.selectbox("Tipo", TIPOS_PERICIA)
                 situacao = st.selectbox("Situação", SITUACOES_PROCESSO)
 
+            # Novo campo de upload de PDF
+            uploaded_pdf = st.file_uploader("Selecionar arquivo do processo (PDF)", type=["pdf"], key="upload_pdf")
+
             # Verificação do intervalo permitido para o horário
             hora_min = datetime.strptime("08:00", "%H:%M").time()
             hora_max = datetime.strptime("16:45", "%H:%M").time()
@@ -413,7 +416,8 @@ def show_processos_view(data_iso, local_name):
                             "tipo": tipo_pericia,
                             "situacao": situacao,
                             "criado_por": st.session_state.username,
-                            "criado_em": datetime.now().isoformat()
+                            "criado_em": datetime.now().isoformat(),
+                            "pdf": uploaded_pdf.read() if uploaded_pdf is not None else None,
                         }
                         st.session_state.processos[key_processos].append(novo_processo)
                         st.success("✅ Processo adicionado com sucesso!")
@@ -477,13 +481,13 @@ def show_processos_view(data_iso, local_name):
             row_cols = st.columns([2, 2, 3, 3, 1.5, 2, 2])
             # BLOCO DE UPLOAD/ANEXO
             with row_cols[0]:
-                # NOVA LÓGICA DE EXIBIÇÃO DO STATUS DE ANEXO
-                if not processo.get("pdf_path"):
-                    st.markdown("🔄 Anexar")
-                elif not processo.get("laudo_gerado"):
-                    st.markdown("⏳ Aguardando")
+                # NOVA LÓGICA DE EXIBIÇÃO DO STATUS DE ANEXO (ATUALIZADO)
+                if processo.get("pdf") is None:
+                    st.write("📎 Anexar")
+                elif processo.get("pre_laudo") is None:
+                    st.write("⏳ Aguardando")
                 else:
-                    st.markdown("✅ Pronto")
+                    st.write("✅ Pronto")
             row_cols[1].write(processo['horario'])
             row_cols[2].write(processo['numero_processo'])
             row_cols[3].write(processo['nome_parte'])
@@ -569,20 +573,17 @@ def show_processos_view(data_iso, local_name):
         st.markdown("### 🧾 Ações em Lote")
         if st.button("🛠️ Gerar Lote de Pré-Laudos"):
             # st.info("⏳ Iniciando leitura dos processos...")  # Remove info/notification
-
+            # (mantido apenas ação de lote, sem botões extras de redigir laudo)
             for idx, processo in enumerate(processos_ordenados):
                 chave_pdf = f"pdf_{key_processos}_{idx}"
                 chave_texto = f"text_{key_processos}_{idx}"
-
                 if chave_pdf in st.session_state:
                     arquivo_pdf = st.session_state[chave_pdf]
                     texto_extraido = extrair_texto_pdf(arquivo_pdf)
                     st.session_state[chave_texto] = texto_extraido
-
                     # Após geração do pré-laudo, marcar laudo_gerado=True
                     st.session_state.processos[key_processos][idx]["laudo_gerado"] = True
-
-                    # Removido exibição de botões de redigir laudo e notificações
+            # Nenhum botão "Redigir Laudo" criado aqui
 
     else:
         st.info("📭 Nenhum processo cadastrado para esta data/local ainda.")
