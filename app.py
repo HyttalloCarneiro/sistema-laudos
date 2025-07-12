@@ -459,22 +459,8 @@ def show_processos_view(data_iso, local_name):
 
         for idx, processo in enumerate(processos_ordenados):
             row_cols = st.columns([2, 2, 3, 3, 1.5, 2, 2])
-            # Ícone 📎 como botão para acionar upload, sem mostrar dropzone do file_uploader
             with row_cols[0]:
-                upload_placeholder = st.empty()
-                if upload_placeholder.button("📎", key=f"upload_btn_{key_processos}_{idx}"):
-                    uploaded_file = st.file_uploader(
-                        label="",
-                        type=["pdf"],
-                        label_visibility="collapsed",
-                        key=f"upload_pdf_{key_processos}_{idx}",
-                    )
-                    if uploaded_file:
-                        if "arquivos_processos" not in st.session_state:
-                            st.session_state.arquivos_processos = {}
-                        st.session_state.arquivos_processos[f"{key_processos}_{idx}"] = uploaded_file
-                        st.success("📎 Arquivo anexado com sucesso.")
-                        upload_placeholder.empty()
+                st.button("📎 Em breve", key=f"anexar_{key_processos}_{idx}", disabled=True)
             row_cols[1].write(processo['horario'])
             row_cols[2].write(processo['numero_processo'])
             row_cols[3].write(processo['nome_parte'])
