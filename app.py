@@ -499,23 +499,25 @@ def show_processos_view(data_iso, local_name):
             row_cols[3].write(processo['nome_parte'])
             row_cols[4].write(processo['tipo'].split('(')[-1].replace(')', ''))
             row_cols[5].write(processo['situacao'])
-            # Novo bloco unificado de botões de ação
-            with row_cols[6]:
-                col_a, col_b, col_c = st.columns([1, 1, 1])
+        # Novo bloco unificado de botões de ação
+        with row_cols[6]:
+            col_a, col_b, col_c = st.columns([1, 1, 1])
 
-                # Removido botão de redigir laudo (📝) e checagem de tipo de processo
-                with col_a:
-                    st.write("")  # Ocupa o espaço para manter alinhamento
+            # Removido botão de redigir laudo (📝) e checagem de tipo de processo
+            with col_a:
+                # Substituição da chamada para redigir_laudo_interface(dados) por redigir_laudo_interface()
+                if st.button("📝", key=f"redigir_{key_processos}_{idx}"):
+                    redigir_laudo_interface()
 
-                with col_b:
-                    if st.button("🚫", key=f"ausente_{key_processos}_{idx}"):
-                        st.session_state.confirm_action = ("ausencia", key_processos, processo)
-                        st.rerun()
+            with col_b:
+                if st.button("🚫", key=f"ausente_{key_processos}_{idx}"):
+                    st.session_state.confirm_action = ("ausencia", key_processos, processo)
+                    st.rerun()
 
-                with col_c:
-                    if st.button("🗑️", key=f"excluir_{key_processos}_{idx}"):
-                        st.session_state.confirm_action = ("excluir", key_processos, processo)
-                        st.rerun()
+            with col_c:
+                if st.button("🗑️", key=f"excluir_{key_processos}_{idx}"):
+                    st.session_state.confirm_action = ("excluir", key_processos, processo)
+                    st.rerun()
 
         # Opções de edição (mantido se necessário)
         if has_permission(st.session_state.user_info, 'editar_pericias'):
