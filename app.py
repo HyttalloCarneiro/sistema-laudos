@@ -6,6 +6,9 @@ from datetime import datetime, date
 import json
 import locale
 
+# Importação do redigir_laudo_ad do módulo de laudo AD
+from pages.laudos_ad import redigir_laudo_ad
+
 # Configuração da página
 st.set_page_config(
     page_title="Sistema de Laudos Periciais",
@@ -306,6 +309,7 @@ def extrair_texto_pdf(uploaded_file):
             texto += pagina.get_text()
     return texto
 
+
 def show_processos_view(data_iso, local_name):
     """Mostra a tela de gerenciamento de processos para uma data/local específico"""
     data_br = format_date_br(data_iso)
@@ -597,7 +601,24 @@ def show_processos_view(data_iso, local_name):
                     texto_extraido = extrair_texto_pdf(arquivo_pdf)
                     st.session_state[chave_texto] = texto_extraido
 
-            st.success("✅ Leitura de todos os PDFs concluída com sucesso!")
+                    tipo = processo["tipo"].strip().upper()
+                    nome = processo["nome_parte"]
+
+                    if tipo == "AD":
+                        st.markdown(f"📄 **{nome}** - Auxílio-Doença")
+                        if st.button(f"✍️ Redigir Laudo", key=f"laudo_ad_{key_processos}_{idx}"):
+                            st.session_state["modo_redacao"] = "AD"
+                            st.session_state["texto_base"] = texto_extraido
+                            st.session_state["nome_paciente"] = nome
+                            st.session_state["pagina"] = "redigir_laudo"
+                    elif tipo == "BPC":
+                        st.write(f"📄 [{nome}] - Gerar laudo de **BPC**")
+                    elif tipo == "DPVAT":
+                        st.write(f"📄 [{nome}] - Gerar laudo de **DPVAT**")
+                    else:
+                        st.warning(f"⚠️ [{nome}] - Tipo de laudo desconhecido: '{tipo}'")
+
+            st.success("✅ Leitura concluída.")
 
     else:
         st.info("📭 Nenhum processo cadastrado para esta data/local ainda.")
@@ -608,6 +629,11 @@ def main():
     init_session_data()
 
     # Tela de login
+    if st.session_state.get("pagina") == "redigir_laudo":
+        if st.session_state.get("modo_redacao") == "AD":
+            redigir_laudo_ad()
+        return
+
     if not st.session_state.authenticated:
         st.title("🔐 Sistema de Laudos Periciais")
         st.markdown("### Acesso Restrito")
