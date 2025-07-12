@@ -468,12 +468,19 @@ def show_processos_view(data_iso, local_name):
                     if st.button("📎 Anexar", key=f"upload_btn_{key_processos}_{idx}"):
                         st.session_state[f"show_uploader_{key_processos}_{idx}"] = True
 
-                    if st.session_state.get(f"show_uploader_{key_processos}_{idx}", False):
-                        uploaded_file = st.file_uploader("Selecionar PDF", type=["pdf"], key=f"file_uploader_{key_processos}_{idx}")
-                        if uploaded_file and not st.session_state[f"uploaded_{key_processos}_{idx}"]:
+                    # Exibe o uploader SOMENTE se o botão foi clicado E ainda não foi feito upload
+                    if (
+                        st.session_state.get(f"show_uploader_{key_processos}_{idx}", False)
+                        and not st.session_state[f"uploaded_{key_processos}_{idx}"]
+                    ):
+                        uploaded_file = st.file_uploader(
+                            "Selecionar PDF", type=["pdf"], key=f"file_uploader_{key_processos}_{idx}"
+                        )
+                        if uploaded_file:
                             st.session_state[f"uploaded_{key_processos}_{idx}"] = True
                             st.session_state[f"pdf_{key_processos}_{idx}"] = uploaded_file
                             st.session_state[f"upload_success_{key_processos}_{idx}"] = True
+                            st.session_state[f"show_uploader_{key_processos}_{idx}"] = False
                 else:
                     st.button("📄 Pronto", key=f"uploaded_btn_{key_processos}_{idx}", disabled=True)
                     if st.session_state.get(f"upload_success_{key_processos}_{idx}"):
