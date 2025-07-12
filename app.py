@@ -577,7 +577,7 @@ def show_processos_view(data_iso, local_name):
             # NOVA LÓGICA DE GERAÇÃO DE PRÉ-LAUDOS EM LOTE
             import tempfile
             import os
-            from .utils import extrair_texto_pdf
+            from utils import extrair_texto_pdf
             from laudos_ad import gerar_laudo_ad
             try:
                 from laudos_bpc import gerar_laudo_bpc
