@@ -467,6 +467,9 @@ def show_processos_view(data_iso, local_name):
                 if not st.session_state[f"uploaded_{key_processos}_{idx}"]:
                     if st.button("📎 Anexar", key=f"upload_btn_{key_processos}_{idx}"):
                         st.session_state[f"show_uploader_{key_processos}_{idx}"] = True
+                    # Reabrir o uploader automaticamente se houve tentativa anterior de upload
+                    elif st.session_state.get(f"pdf_{key_processos}_{idx}"):
+                        st.session_state[f"show_uploader_{key_processos}_{idx}"] = False
 
                     # Exibe o uploader SOMENTE se o botão foi clicado E ainda não foi feito upload
                     if (
