@@ -605,22 +605,23 @@ def show_processos_view(data_iso, local_name):
                     texto_extraido = extrair_texto_pdf(arquivo_pdf)
                     st.session_state[chave_texto] = texto_extraido
 
-                    tipo = processo["tipo"].strip().upper()
+                    tipo_laudo = processo["tipo"]
+                    tipo_laudo_normalizado = tipo_laudo.upper().strip()
                     nome = processo["nome_parte"]
 
-                    if tipo == "AD":
+                    if tipo_laudo_normalizado in ["AD", "AUXÍLIO DOENÇA (AD)"]:
                         st.markdown(f"📄 **{nome}** - Auxílio-Doença")
                         if st.button(f"✍️ Redigir Laudo", key=f"laudo_ad_{key_processos}_{idx}"):
                             st.session_state["modo_redacao"] = "AD"
                             st.session_state["texto_base"] = texto_extraido
                             st.session_state["nome_paciente"] = nome
                             st.session_state["pagina"] = "redigir_laudo"
-                    elif tipo == "BPC":
+                    elif tipo_laudo_normalizado == "BPC":
                         st.write(f"📄 [{nome}] - Gerar laudo de **BPC**")
-                    elif tipo == "DPVAT":
+                    elif tipo_laudo_normalizado == "DPVAT":
                         st.write(f"📄 [{nome}] - Gerar laudo de **DPVAT**")
                     else:
-                        st.warning(f"⚠️ [{nome}] - Tipo de laudo desconhecido: '{tipo}'")
+                        st.warning(f"⚠️ [{nome}] - Tipo de laudo desconhecido: '{tipo_laudo}'")
 
             st.success("✅ Leitura concluída.")
 
