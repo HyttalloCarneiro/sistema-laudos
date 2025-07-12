@@ -607,10 +607,19 @@ def show_processos_view(data_iso, local_name):
                     # Extrai texto
                     texto_extraido = extrair_texto_pdf(pdf_path)
                     # Gera laudo conforme tipo
-                    tipo_raw = processo.get("tipo", "")
-                    if "AD" in tipo_raw:
+                    tipo = processo.get("tipo", "")
+                    autor = processo.get("numero_processo", "")  # Usando numero_processo como chave identificadora
+                    if "AD" in tipo:
+                        # Armazena textos no st.session_state para uso em laudos_ad.py
+                        if "laudos_ad" not in st.session_state:
+                            st.session_state["laudos_ad"] = {}
+                        st.session_state["laudos_ad"][autor] = {
+                            "anamnese": texto_extraido,
+                            "exame_clinico": texto_extraido,
+                            "conclusao": texto_extraido
+                        }
                         laudo = redigir_laudo_interface(texto_extraido)
-                    elif "BPC" in tipo_raw:
+                    elif "BPC" in tipo:
                         laudo = gerar_laudo_bpc(texto_extraido)
                     else:
                         laudo = None
