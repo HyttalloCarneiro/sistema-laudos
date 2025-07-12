@@ -459,20 +459,23 @@ def show_processos_view(data_iso, local_name):
 
         for idx, processo in enumerate(processos_ordenados):
             row_cols = st.columns([2, 2, 3, 3, 1.5, 2, 2])
+            # BLOCO DE UPLOAD/ANEXO
             with row_cols[0]:
-                uploaded_file = st.file_uploader(" ", type=["pdf"], key=f"file_uploader_{key_processos}_{idx}", label_visibility="collapsed")
-
                 if f"uploaded_{key_processos}_{idx}" not in st.session_state:
                     st.session_state[f"uploaded_{key_processos}_{idx}"] = False
 
-                if uploaded_file and not st.session_state[f"uploaded_{key_processos}_{idx}"]:
-                    st.session_state[f"uploaded_{key_processos}_{idx}"] = True
-                    # Aqui você pode adicionar código para armazenar o arquivo, se necessário.
+                if not st.session_state[f"uploaded_{key_processos}_{idx}"]:
+                    if st.button("📎 Anexar", key=f"upload_btn_{key_processos}_{idx}"):
+                        st.session_state[f"show_uploader_{key_processos}_{idx}"] = True
 
-                if st.session_state[f"uploaded_{key_processos}_{idx}"]:
-                    st.button("📄", key=f"uploaded_icon_{key_processos}_{idx}", disabled=True)
+                    if st.session_state.get(f"show_uploader_{key_processos}_{idx}", False):
+                        uploaded_file = st.file_uploader("Selecionar PDF", type=["pdf"], key=f"file_uploader_{key_processos}_{idx}")
+                        if uploaded_file:
+                            st.session_state[f"uploaded_{key_processos}_{idx}"] = True
+                            st.success("✅ Arquivo carregado com sucesso!")
+                            st.experimental_rerun()
                 else:
-                    st.button("📎", key=f"upload_icon_{key_processos}_{idx}")
+                    st.button("📄 Pronto", key=f"uploaded_btn_{key_processos}_{idx}", disabled=True)
             row_cols[1].write(processo['horario'])
             row_cols[2].write(processo['numero_processo'])
             row_cols[3].write(processo['nome_parte'])
