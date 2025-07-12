@@ -1,9 +1,6 @@
 import sys
 import os
-
-pages_path = os.path.join(os.path.dirname(__file__), "pages")
-if pages_path not in sys.path:
-    sys.path.append(pages_path)
+sys.path.append(os.path.join(os.path.dirname(__file__), "pages"))
 
 import streamlit as st
 import fitz  # PyMuPDF
@@ -14,7 +11,7 @@ import json
 import locale
 
 # Ajuste dos imports dos módulos das páginas
-from pages import laudos_ad
+import laudos_ad
 
 # Configuração da página
 st.set_page_config(
