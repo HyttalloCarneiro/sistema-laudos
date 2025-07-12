@@ -1,3 +1,10 @@
+import sys
+import os
+
+pages_path = os.path.join(os.path.dirname(__file__), "pages")
+if pages_path not in sys.path:
+    sys.path.append(pages_path)
+
 import streamlit as st
 import fitz  # PyMuPDF
 import pandas as pd
@@ -6,11 +13,7 @@ from datetime import datetime, date
 import json
 import locale
 
-# Bloco para garantir que a pasta 'pages' está no sys.path (antes do import do redigir_laudo_ad)
-import os
-import sys
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), 'pages')))
-
+# Ajuste dos imports dos módulos das páginas
 from laudos_ad import redigir_laudo_ad
 
 # Configuração da página
