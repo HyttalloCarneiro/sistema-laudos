@@ -14,7 +14,7 @@ import json
 import locale
 
 # Ajuste dos imports dos módulos das páginas
-from pages.laudos_ad import redigir_laudo_ad
+from pages import laudos_ad
 
 # Configuração da página
 st.set_page_config(
@@ -638,7 +638,7 @@ def main():
     # Tela de login
     if st.session_state.get("pagina") == "redigir_laudo":
         if st.session_state.get("modo_redacao") == "AD":
-            redigir_laudo_ad()
+            laudos_ad.redigir_laudo_ad()
         return
 
     if not st.session_state.authenticated:
