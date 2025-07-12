@@ -11,7 +11,7 @@ import json
 import locale
 
 # Ajuste dos imports dos módulos das páginas
-from laudos_ad import gerar_laudo_ad
+from pages.laudos_ad import gerar_laudo_ad
 
 # Configuração da página
 st.set_page_config(
@@ -578,7 +578,7 @@ def show_processos_view(data_iso, local_name):
             import tempfile
             import os
             from utils import extrair_texto_pdf
-            from laudos_ad import gerar_laudo_ad
+            from pages.laudos_ad import gerar_laudo_ad
             try:
                 from laudos_bpc import gerar_laudo_bpc
             except ImportError:
