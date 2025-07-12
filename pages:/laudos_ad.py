@@ -35,3 +35,9 @@ def redigir_laudo_interface(dados):
 
     if st.button("💾 Salvar Laudo"):
         st.success("Laudo salvo com sucesso! (simulação)")
+
+
+# Função para gerar laudo automaticamente conforme padrões da 17ª Vara
+def gerar_laudo_ad(texto_extraido, nome_parte):
+    # Aqui você pode ajustar o template conforme os padrões da 17ª Vara
+    return f"Laudo gerado automaticamente para {nome_parte}.\n\nResumo extraído do processo:\n{texto_extraido}"
