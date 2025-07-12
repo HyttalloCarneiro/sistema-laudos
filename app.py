@@ -11,7 +11,7 @@ import json
 import locale
 
 # Ajuste dos imports dos módulos das páginas
-from pages.laudos_ad import gerar_laudos_ad
+from pages.laudos_ad import gerar_laudo_ad
 
 # Configuração da página
 st.set_page_config(
