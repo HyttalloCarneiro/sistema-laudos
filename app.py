@@ -477,34 +477,13 @@ def show_processos_view(data_iso, local_name):
             row_cols = st.columns([2, 2, 3, 3, 1.5, 2, 2])
             # BLOCO DE UPLOAD/ANEXO
             with row_cols[0]:
-                if f"uploaded_{key_processos}_{idx}" not in st.session_state:
-                    st.session_state[f"uploaded_{key_processos}_{idx}"] = False
-
-                if not st.session_state[f"uploaded_{key_processos}_{idx}"]:
-                    if st.button("📎 Anexar", key=f"upload_btn_{key_processos}_{idx}"):
-                        st.session_state[f"show_uploader_{key_processos}_{idx}"] = True
-                    # Reabrir o uploader automaticamente se houve tentativa anterior de upload
-                    elif st.session_state.get(f"pdf_{key_processos}_{idx}"):
-                        st.session_state[f"show_uploader_{key_processos}_{idx}"] = False
-
-                    # Exibe o uploader SOMENTE se o botão foi clicado E ainda não foi feito upload
-                    if (
-                        st.session_state.get(f"show_uploader_{key_processos}_{idx}", False)
-                        and not st.session_state[f"uploaded_{key_processos}_{idx}"]
-                    ):
-                        uploaded_file = st.file_uploader(
-                            "Selecionar PDF", type=["pdf"], key=f"file_uploader_{key_processos}_{idx}"
-                        )
-                        if uploaded_file:
-                            st.session_state[f"uploaded_{key_processos}_{idx}"] = True
-                            st.session_state[f"pdf_{key_processos}_{idx}"] = uploaded_file
-                            st.session_state[f"upload_success_{key_processos}_{idx}"] = True
-                            st.session_state[f"show_uploader_{key_processos}_{idx}"] = False
+                # NOVA LÓGICA DE EXIBIÇÃO DO STATUS DE ANEXO
+                if not processo.get("pdf_path"):
+                    st.markdown("🔄 Anexar")
+                elif not processo.get("laudo_gerado"):
+                    st.markdown("⏳ Aguardando")
                 else:
-                    st.button("📄 Pronto", key=f"uploaded_btn_{key_processos}_{idx}", disabled=True)
-                    if st.session_state.get(f"upload_success_{key_processos}_{idx}"):
-                        st.success("✅ Arquivo carregado com sucesso!")
-                        st.session_state[f"upload_success_{key_processos}_{idx}"] = False
+                    st.markdown("✅ Pronto")
             row_cols[1].write(processo['horario'])
             row_cols[2].write(processo['numero_processo'])
             row_cols[3].write(processo['nome_parte'])
@@ -514,14 +493,9 @@ def show_processos_view(data_iso, local_name):
             with row_cols[6]:
                 col_a, col_b, col_c = st.columns([1, 1, 1])
 
-                # Exibe botão de redigir laudo apenas se a situação não for Ausente
-                if processo['situacao'] != 'Ausente':
-                    with col_a:
-                        if st.button("📝", key=f"laudo_{key_processos}_{idx}"):
-                            pass  # A função será implementada posteriormente
-                else:
-                    with col_a:
-                        st.write("")  # Ocupa o espaço para manter alinhamento
+                # Removido botão de redigir laudo (📝) e checagem de tipo de processo
+                with col_a:
+                    st.write("")  # Ocupa o espaço para manter alinhamento
 
                 with col_b:
                     if st.button("🚫", key=f"ausente_{key_processos}_{idx}"):
@@ -594,7 +568,7 @@ def show_processos_view(data_iso, local_name):
         # Bloco: Ações em Lote
         st.markdown("### 🧾 Ações em Lote")
         if st.button("🛠️ Gerar Lote de Pré-Laudos"):
-            st.info("⏳ Iniciando leitura dos processos...")
+            # st.info("⏳ Iniciando leitura dos processos...")  # Remove info/notification
 
             for idx, processo in enumerate(processos_ordenados):
                 chave_pdf = f"pdf_{key_processos}_{idx}"
@@ -605,25 +579,10 @@ def show_processos_view(data_iso, local_name):
                     texto_extraido = extrair_texto_pdf(arquivo_pdf)
                     st.session_state[chave_texto] = texto_extraido
 
-                    tipo_laudo = processo["tipo"]
-                    tipo_laudo_normalizado = tipo_laudo.upper().strip()
-                    nome = processo["nome_parte"]
+                    # Após geração do pré-laudo, marcar laudo_gerado=True
+                    st.session_state.processos[key_processos][idx]["laudo_gerado"] = True
 
-                    if tipo_laudo_normalizado in ["AD", "AUXÍLIO DOENÇA (AD)"]:
-                        st.markdown(f"📄 **{nome}** - Auxílio-Doença")
-                        if st.button(f"✍️ Redigir Laudo", key=f"laudo_ad_{key_processos}_{idx}"):
-                            st.session_state["modo_redacao"] = "AD"
-                            st.session_state["texto_base"] = texto_extraido
-                            st.session_state["nome_paciente"] = nome
-                            st.session_state["pagina"] = "redigir_laudo"
-                    elif tipo_laudo_normalizado == "BPC":
-                        st.write(f"📄 [{nome}] - Gerar laudo de **BPC**")
-                    elif tipo_laudo_normalizado == "DPVAT":
-                        st.write(f"📄 [{nome}] - Gerar laudo de **DPVAT**")
-                    else:
-                        st.warning(f"⚠️ [{nome}] - Tipo de laudo desconhecido: '{tipo_laudo}'")
-
-            st.success("✅ Leitura concluída.")
+                    # Removido exibição de botões de redigir laudo e notificações
 
     else:
         st.info("📭 Nenhum processo cadastrado para esta data/local ainda.")
@@ -637,6 +596,9 @@ def main():
     if st.session_state.get("pagina") == "redigir_laudo":
         if st.session_state.get("modo_redacao") == "AD":
             laudos_ad.redigir_laudo_ad()
+        elif st.session_state.get("modo_redacao") == "BPC":
+            from pages.laudos_bpc import redigir_laudo_bpc
+            redigir_laudo_bpc(st.session_state.get("processo_atual"))
         return
 
     if not st.session_state.authenticated:
