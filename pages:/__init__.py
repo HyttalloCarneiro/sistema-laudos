@@ -1,1 +1,1 @@
-# Torna o diretório pages um pacote Python válido
+from pages.laudos_ad import gerar_laudo_ad
