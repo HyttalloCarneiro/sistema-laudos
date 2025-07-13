@@ -1591,8 +1591,8 @@ def gerar_laudo_ad(processo):
 
 
 
+
 # Definição da função gerenciar_configuracoes conforme solicitado:
 def gerenciar_configuracoes():
-    import streamlit as st
-    st.subheader("⚙️ Configurações")
-    st.info("Área reservada para gerenciamento de modelos de exame clínico e patologias mais usuais (em construção).")
+    st.markdown("## ⚙️ Configurações")
+    st.markdown("Área em construção para gerenciamento de modelos de exame clínico e patologias mais usuais.")
