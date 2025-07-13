@@ -6,7 +6,7 @@ import os
 sys.path.append(os.path.join(os.path.dirname(__file__), 'pages'))
 import streamlit as st
 from configuracoes import gerenciar_configuracoes
-from configuracoes import exibir_configuracoes
+# from configuracoes import exibir_configuracoes
 import fitz  # PyMuPDF
 import pandas as pd
 import calendar
@@ -988,10 +988,8 @@ def main():
             show_local_specific_view(st.session_state.current_local_filter)
         
         elif "⚙️ Configurações" in menu_selecionado:
-            exibir_configuracoes()
-        else:
-            st.session_state['pagina'] = 'calendario'
-            st.experimental_rerun()
+            # exibir_configuracoes()
+            pass
 
 def editar_laudo_ad(processo):
     """Renderiza a tela de redação do laudo AD em duas colunas, com informações do periciando à esquerda."""
