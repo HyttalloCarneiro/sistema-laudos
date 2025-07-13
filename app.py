@@ -4,7 +4,6 @@ sys.path.append(os.path.join(os.path.dirname(__file__), 'pages'))
 import sys
 import os
 sys.path.append(os.path.join(os.path.dirname(__file__), 'pages'))
-from funcoes.configuracoes import gerenciar_configuracoes
 import streamlit as st
 import fitz  # PyMuPDF
 import pandas as pd
@@ -1595,7 +1594,40 @@ def gerar_laudo_ad(processo):
 
 
 
+
 # Definição da função gerenciar_configuracoes conforme solicitado:
 def gerenciar_configuracoes():
     st.markdown("## ⚙️ Configurações")
-    st.markdown("Área em construção para gerenciamento de modelos de exame clínico e patologias mais usuais.")
+
+    aba = st.selectbox("Escolha o que deseja gerenciar:", ["Modelos de exame clínico", "Modelos de patologias"])
+
+    if aba == "Modelos de exame clínico":
+        st.subheader("Modelos de exame clínico")
+
+        if "modelos_exame_clinico" not in st.session_state:
+            st.session_state.modelos_exame_clinico = {}
+
+        nome_modelo = st.text_input("Nome do modelo")
+        conteudo_modelo = st.text_area("Conteúdo do modelo")
+
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("Salvar modelo"):
+                if nome_modelo and conteudo_modelo:
+                    st.session_state.modelos_exame_clinico[nome_modelo] = conteudo_modelo
+                    st.success(f"Modelo '{nome_modelo}' salvo com sucesso.")
+        with col2:
+            if st.button("Excluir modelo"):
+                if nome_modelo in st.session_state.modelos_exame_clinico:
+                    del st.session_state.modelos_exame_clinico[nome_modelo]
+                    st.success(f"Modelo '{nome_modelo}' excluído com sucesso.")
+
+        if st.session_state.modelos_exame_clinico:
+            st.markdown("### Modelos cadastrados:")
+            for nome, conteudo in st.session_state.modelos_exame_clinico.items():
+                with st.expander(nome):
+                    st.write(conteudo)
+
+    elif aba == "Modelos de patologias":
+        st.subheader("Modelos de patologias (ainda não implementado)")
+        st.info("Essa funcionalidade será implementada em breve.")
