@@ -15,7 +15,7 @@ import json
 import locale
 
 # Ajuste dos imports dos módulos das páginas
-from laudos_ad import redigir_laudo_interface
+from laudos_ad import redigir_lote_pre_laudos
 
 # Configuração da página
 st.set_page_config(
@@ -580,57 +580,8 @@ def show_processos_view(data_iso, local_name):
         # Bloco: Ações em Lote
         st.markdown("### 🧾 Ações em Lote")
         if st.button("🛠️ Gerar Lote de Pré-Laudos"):
-            # NOVA LÓGICA DE GERAÇÃO DE PRÉ-LAUDOS EM LOTE
-            import tempfile
-            import os
-            from utils import extrair_texto_pdf
-            from pages.laudos_ad import redigir_laudo_interface
-            try:
-                from laudos_bpc import gerar_laudo_bpc
-            except ImportError:
-                def gerar_laudo_bpc(x): return "Pré-laudo BPC não implementado"
-            for processo in processos_ordenados:
-                # Considera status "Aguardando" e PDF carregado
-                # Adiciona campos de controle, se necessário
-                if "anexo_status" not in processo:
-                    if processo.get("pdf") is not None:
-                        processo["anexo_status"] = "Aguardando"
-                    else:
-                        processo["anexo_status"] = None
-                if processo["anexo_status"] == "Aguardando" and processo.get("pdf") is not None:
-                    # Salva PDF temporariamente
-                    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_pdf:
-                        tmp_pdf.write(processo["pdf"])
-                        tmp_pdf.flush()
-                        pdf_path = tmp_pdf.name
-                    processo["pdf_path"] = pdf_path
-                    # Extrai texto
-                    texto_extraido = extrair_texto_pdf(pdf_path)
-                    # Gera laudo conforme tipo
-                    tipo = processo.get("tipo", "")
-                    autor = processo.get("numero_processo", "")  # Usando numero_processo como chave identificadora
-                    if "AD" in tipo:
-                        # Armazena textos no st.session_state para uso em laudos_ad.py
-                        if "laudos_ad" not in st.session_state:
-                            st.session_state["laudos_ad"] = {}
-                        st.session_state["laudos_ad"][autor] = {
-                            "anamnese": texto_extraido,
-                            "exame_clinico": texto_extraido,
-                            "conclusao": texto_extraido
-                        }
-                        laudo = redigir_laudo_interface(texto_extraido)
-                    elif "BPC" in tipo:
-                        laudo = gerar_laudo_bpc(texto_extraido)
-                    else:
-                        laudo = None
-                    processo["laudo"] = laudo
-                    processo["anexo_status"] = "Pronto"
-                    # Remove PDF temporário
-                    try:
-                        os.remove(pdf_path)
-                        processo["pdf_path"] = None
-                    except Exception:
-                        pass
+            # Utiliza a função de lote de pré-laudos do laudos_ad.py
+            redigir_lote_pre_laudos(processos_ordenados)
             st.success("✅ Lote de pré-laudos gerado com sucesso!")
             st.rerun()
 
