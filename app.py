@@ -1366,38 +1366,24 @@ def editar_laudo_ad(processo):
         else:
             st.markdown("- Nenhum benefício anterior informado")
         st.divider()
-        # Renderizar as caixas de upload lado a lado, mais quadradas e alinhadas
-        col_foto, col_docs = st.columns(2)
-        with col_foto:
-            st.markdown(
-                "<div style='margin-bottom:6px;'><b>📸 Foto 3x4 do periciando</b></div>",
-                unsafe_allow_html=True,
-                help="Foto tirada no dia da perícia"
-            )
-            st.markdown(
-                "<style>div[data-testid='stFileUploader']{min-width:150px;min-height:150px;max-width:220px;max-height:220px; margin-bottom: 12px;}</style>",
-                unsafe_allow_html=True
-            )
-            foto_periciando = st.file_uploader(
-                "Arraste ou selecione a foto",
+        # Renderizar as caixas de upload lado a lado, reduzidas, usando st.columns([1, 1])
+        col1, col2 = st.columns([1, 1])
+        with col1:
+            st.markdown("📸 **Foto 3x4**")
+            st.file_uploader(
+                "Foto 3x4 do periciando",
                 type=["jpg", "jpeg", "png"],
-                key="foto_periciando"
+                key="foto_3x4",
+                label_visibility="collapsed"
             )
-        with col_docs:
-            st.markdown(
-                "<div style='margin-bottom:6px;'><b>🗂️ Documentos médicos apresentados</b></div>",
-                unsafe_allow_html=True,
-                help="Arquivos entregues no dia"
-            )
-            st.markdown(
-                "<style>div[data-testid='stFileUploader']{min-width:150px;min-height:150px;max-width:220px;max-height:220px; margin-bottom: 12px;}</style>",
-                unsafe_allow_html=True
-            )
-            documentos_medicos = st.file_uploader(
-                "Arraste ou selecione os arquivos",
+        with col2:
+            st.markdown("📑 **Docs médicos**")
+            st.file_uploader(
+                "Documentos médicos apresentados",
                 type=["jpg", "jpeg", "png"],
                 accept_multiple_files=True,
-                key="documentos_medicos"
+                key="docs_medicos",
+                label_visibility="collapsed"
             )
     with col_dir:
         # Campos principais do laudo (mantendo campos editáveis)
