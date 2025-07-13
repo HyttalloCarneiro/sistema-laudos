@@ -1016,6 +1016,9 @@ def editar_laudo_ad(processo):
     if not data_str:
         if "key_processos" in processo:
             data_str = processo["key_processos"].split("_")[0]
+    # Garantir que data_str esteja definido para evitar NameError
+    if 'data_str' not in locals():
+        data_str = "01-01-2025"  # valor padrão ou obtido de outro local
     # Converter data para objeto date
     data = None
     if isinstance(data_str, date):
