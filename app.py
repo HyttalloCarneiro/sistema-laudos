@@ -1028,16 +1028,22 @@ def main():
         elif menu_selecionado.strip() == "⚙️ Configurações":
             st.markdown("## ⚙️ Configurações do Sistema")
             categoria = st.radio("Escolha uma categoria para gerenciar:", ["Modelos de Exame Clínico", "Modelos de Patologias"])
+
             if categoria == "Modelos de Exame Clínico":
                 st.markdown("### Modelos de Exame Clínico")
                 novo_modelo = st.text_area("Novo modelo de exame clínico")
                 if st.button("Salvar modelo"):
-                    st.success("Modelo salvo com sucesso (exemplo).")
+                    st.success("Modelo salvo com sucesso!")  # Simulação do salvamento
             elif categoria == "Modelos de Patologias":
                 st.markdown("### Modelos de Patologias")
                 nova_patologia = st.text_input("Nova patologia")
                 if st.button("Salvar patologia"):
-                    st.success("Patologia salva com sucesso (exemplo).")
+                    st.success("Patologia salva com sucesso!")  # Simulação do salvamento
+
+            st.sidebar.markdown("---")
+            if st.sidebar.button("📅 Voltar ao Calendário Principal"):
+                st.session_state["menu"] = "menu_principal"
+                st.experimental_rerun()
         else:
             # Interface principal - calendário
             tab1, tab2 = st.tabs(["📅 Calendário e Perícias", "📋 Gerenciar Perícias"])
