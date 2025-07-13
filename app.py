@@ -1,6 +1,9 @@
 import sys
 import os
 sys.path.append(os.path.join(os.path.dirname(__file__), 'pages'))
+import sys
+import os
+sys.path.append(os.path.join(os.path.dirname(__file__), 'pages'))
 import streamlit as st
 import fitz  # PyMuPDF
 import pandas as pd
