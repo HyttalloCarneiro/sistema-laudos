@@ -1436,8 +1436,7 @@ def editar_laudo_ad(processo):
             key="resultado_exame_fisico",
             height=150
         )
-        # 2. Subtítulo "Escolha um modelo" e selectbox de modelos logo abaixo
-        st.markdown("#### Escolha um modelo")
+        # 2. Selectbox de modelos logo abaixo (sem o subtítulo "Escolha um modelo")
         modelos_exame_clinico = {
             "Dor lombar (Lombalgia)": "Paciente apresenta dor à palpação em região lombossacral, com rigidez matinal e leve limitação à flexão lombar. Teste de Lasègue negativo. Marcha preservada.",
             "Transtorno depressivo (Depressão)": "Paciente relata humor deprimido, anedonia, distúrbios de sono e apetite. Apresenta-se orientado, mas com lentificação psicomotora e olhar cabisbaixo. Não há sinais psicóticos.",
