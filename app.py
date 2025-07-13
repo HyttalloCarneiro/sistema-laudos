@@ -578,13 +578,17 @@ def show_processos_view(data_iso, local_name):
         st.markdown("### 🧾 Ações em Lote")
         if st.button("🛠️ Gerar Lote de Pré-Laudos"):
             for processo in processos_ordenados:
-                if processo["tipo"] == "AD":
-                    laudo = gerar_laudo_ad(processo=processo)
-                    processo["laudo"] = laudo
-                    processo["situacao"] = "Pronto"
-                    if "arquivo" in processo:
-                        os.remove(processo["arquivo"])
-                        del processo["arquivo"]
+                tipo = processo.get("tipo", "").upper()
+                if tipo == "AD":
+                    gerar_laudo_ad(processo=processo)
+                # futuro: elif tipo == "BPC":
+                #     gerar_laudo_bpc(processo=processo)
+                
+                processo["anexo_status"] = "Pronto"
+                
+                if "arquivo_path" in processo and os.path.exists(processo["arquivo_path"]):
+                    os.remove(processo["arquivo_path"])
+                    processo["arquivo_path"] = ""
             st.success("✅ Lote de pré-laudos gerado com sucesso!")
             st.rerun()
 
