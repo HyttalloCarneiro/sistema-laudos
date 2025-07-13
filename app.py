@@ -1346,6 +1346,16 @@ def editar_laudo_ad(processo):
             st.markdown("**Data de nascimento:** -")
         st.markdown(f"**Idade:** {idade if idade is not None else '-'} anos")
         st.markdown(f"**Tipo:** {tipo}")
+        # DER
+        der_data = processo.get("der", "")
+        if der_data:
+            try:
+                der_formatada = datetime.strptime(der_data, "%Y-%m-%d").strftime("%d-%m-%Y")
+            except ValueError:
+                der_formatada = der_data
+            st.markdown(f"**DER:** {der_formatada}")
+        else:
+            st.markdown("**DER:** -")
         st.markdown("**Histórico de benefícios:**")
         if historico_beneficios:
             for item in historico_beneficios:
