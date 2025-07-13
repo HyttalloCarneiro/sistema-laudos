@@ -1026,59 +1026,18 @@ def main():
             show_local_specific_view(st.session_state.current_local_filter)
         
         elif menu_selecionado.strip() == "⚙️ Configurações":
-            st.subheader("⚙️ Configurações do Sistema")
-
-            aba = st.radio("Escolha o que deseja configurar:", ["Modelos de Exame Clínico", "Modelos de Patologias"])
-
-            if "modelos_exame_clinico" not in st.session_state:
-                st.session_state.modelos_exame_clinico = {}
-
-            if "modelos_patologias" not in st.session_state:
-                st.session_state.modelos_patologias = {}
-
-            if aba == "Modelos de Exame Clínico":
+            st.markdown("## ⚙️ Configurações do Sistema")
+            categoria = st.radio("Escolha uma categoria para gerenciar:", ["Modelos de Exame Clínico", "Modelos de Patologias"])
+            if categoria == "Modelos de Exame Clínico":
                 st.markdown("### Modelos de Exame Clínico")
-
-                nome = st.text_input("Nome do modelo")
-                conteudo = st.text_area("Conteúdo do exame clínico")
-
+                novo_modelo = st.text_area("Novo modelo de exame clínico")
                 if st.button("Salvar modelo"):
-                    if nome and conteudo:
-                        st.session_state.modelos_exame_clinico[nome] = conteudo
-                        st.success(f"Modelo '{nome}' salvo com sucesso.")
-                    else:
-                        st.warning("Preencha todos os campos.")
-
-                if st.session_state.modelos_exame_clinico:
-                    st.markdown("#### Modelos existentes:")
-                    modelo_selecionado = st.selectbox("Escolha um modelo", list(st.session_state.modelos_exame_clinico.keys()))
-                    st.code(st.session_state.modelos_exame_clinico[modelo_selecionado])
-
-                    if st.button("Excluir modelo selecionado"):
-                        del st.session_state.modelos_exame_clinico[modelo_selecionado]
-                        st.success(f"Modelo '{modelo_selecionado}' excluído com sucesso.")
-
-            elif aba == "Modelos de Patologias":
-                st.markdown("### Modelos de Patologias Mais Usuais")
-
-                nome = st.text_input("Nome da patologia")
-                descricao = st.text_area("Descrição e conduta")
-
+                    st.success("Modelo salvo com sucesso (exemplo).")
+            elif categoria == "Modelos de Patologias":
+                st.markdown("### Modelos de Patologias")
+                nova_patologia = st.text_input("Nova patologia")
                 if st.button("Salvar patologia"):
-                    if nome and descricao:
-                        st.session_state.modelos_patologias[nome] = descricao
-                        st.success(f"Patologia '{nome}' salva com sucesso.")
-                    else:
-                        st.warning("Preencha todos os campos.")
-
-                if st.session_state.modelos_patologias:
-                    st.markdown("#### Patologias cadastradas:")
-                    patologia_selecionada = st.selectbox("Escolha uma patologia", list(st.session_state.modelos_patologias.keys()))
-                    st.code(st.session_state.modelos_patologias[patologia_selecionada])
-
-                    if st.button("Excluir patologia selecionada"):
-                        del st.session_state.modelos_patologias[patologia_selecionada]
-                        st.success(f"Patologia '{patologia_selecionada}' excluída com sucesso.")
+                    st.success("Patologia salva com sucesso (exemplo).")
         else:
             # Interface principal - calendário
             tab1, tab2 = st.tabs(["📅 Calendário e Perícias", "📋 Gerenciar Perícias"])
