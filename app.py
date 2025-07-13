@@ -1019,18 +1019,23 @@ def editar_laudo_ad(processo):
     # Garantir que data_str esteja definido para evitar NameError
     if 'data_str' not in locals():
         data_str = "01-01-2025"  # valor padrão ou obtido de outro local
-    # Converter data para objeto date
+    # Converter data para objeto date (ajuste para prevenir falhas)
     data = None
     if isinstance(data_str, date):
         data = data_str
     elif isinstance(data_str, str):
-        try:
-            data = datetime.strptime(data_str, "%Y-%m-%d").date()
-        except Exception:
+        # NOVA LÓGICA: só tenta converter se data_str não for vazio
+        if data_str:
             try:
-                data = datetime.strptime(data_str, "%d-%m-%Y").date()
+                data = datetime.strptime(data_str, "%Y-%m-%d").date()
             except Exception:
-                data = None
+                try:
+                    data = datetime.strptime(data_str, "%d-%m-%Y").date()
+                except Exception:
+                    data = None
+        else:
+            st.error("Data inválida.")
+            return
     # Calcular idade se não fornecida
     if idade is None and data_nascimento and data:
         if isinstance(data_nascimento, str):
