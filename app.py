@@ -422,9 +422,8 @@ def show_processos_view(data_iso, local_name):
                         }
                         st.session_state.processos[key_processos].append(novo_processo)
                         st.success("✅ Processo adicionado com sucesso!")
-                        # Remover ou comentar a linha abaixo para evitar NameError
-                        # st.rerun()
-                        # Use st.experimental_rerun se necessário, mas removido conforme instrução
+                        st.session_state.view = "processos"
+                        st.rerun()
                         return
                 else:
                     st.error("❌ Número do processo e nome da parte são obrigatórios!")
@@ -506,13 +505,10 @@ def show_processos_view(data_iso, local_name):
                 # Botão de redigir laudo
                 with col_a:
                     if st.button("📝", key=f"redigir_{key_processos}_{idx}"):
-                        # Ao clicar, define a página de edição de laudo e salva o processo a ser editado
-                        st.session_state.page = "editar_laudo_ad"
-                        st.session_state.processo_editando = {
-                            "key_processos": key_processos,
-                            "idx": idx
-                        }
-                        st.experimental_rerun()
+                        # Redirecionar para a tela de edição de laudo, salvando o processo em edição
+                        st.session_state.view = "editar_laudo"
+                        st.session_state.processo_em_edicao = processo
+                        st.rerun()
 
                 with col_b:
                     if st.button("🚫", key=f"ausente_{key_processos}_{idx}"):
@@ -668,6 +664,11 @@ def main():
         elif st.session_state.get("modo_redacao") == "BPC":
             from laudos_bpc import redigir_laudo_bpc
             redigir_laudo_bpc(st.session_state.get("processo_atual"))
+        return
+
+    # Novo bloco: tela de edição de laudo
+    if st.session_state.get("view") == "editar_laudo":
+        editar_laudo_ad(st.session_state.processo_em_edicao)
         return
 
     if not st.session_state.authenticated:
@@ -1262,6 +1263,68 @@ def main():
                                 pass  # Removido para evitar erro de execução
                 else:
                     st.info("📭 Nenhuma perícia agendada ainda.")
+
+def editar_laudo_ad(processo):
+    """Renderiza a tela de edição de laudo AD amigável, substituindo a interface de processos."""
+    st.set_page_config(
+        page_title="Redigir Laudo AD",
+        page_icon="📝",
+        layout="wide",
+        initial_sidebar_state="collapsed"
+    )
+    st.markdown("# ✍️ Redação do Laudo - Auxílio Doença (AD)")
+    st.markdown("---")
+    # Botão para voltar
+    if st.button("⬅️ Voltar para Processos do Dia"):
+        st.session_state.view = "processos"
+        st.rerun()
+
+    col1, col2 = st.columns(2)
+    with col1:
+        nome = st.text_input("Nome do Periciando", value=processo.get("nome", processo.get("nome_parte", "")))
+        data_nascimento = st.date_input("Data de nascimento", value=processo.get("data_nascimento", date.today()))
+
+    with col2:
+        profissao = st.text_input("Profissão", value=processo.get("profissao", ""))
+        cid = st.text_input("CID(s) relacionado(s)", value=processo.get("cid", ""))
+
+    st.markdown("### 🩺 Anamnese")
+    anamnese = st.text_area("Descreva os dados clínicos e históricos relevantes", value=processo.get("anamnese", ""))
+
+    st.markdown("### 🧪 Exame Físico")
+    exame_fisico = st.text_area("Resultado do exame físico realizado", value=processo.get("exame_fisico", ""))
+
+    st.markdown("### 📁 Documentos Apresentados")
+    documentos = st.text_area("Laudos, exames e atestados apresentados", value=processo.get("documentos", ""))
+
+    st.markdown("### 📆 Incapacidade")
+    incapacidade = st.selectbox("Houve incapacidade laboral?", ["Sim", "Não", "Parcial", "Permanente"], index=["Sim", "Não", "Parcial", "Permanente"].index(processo.get("incapacidade", "Sim")) if processo.get("incapacidade") in ["Sim", "Não", "Parcial", "Permanente"] else 0)
+    data_inicio = st.date_input("Data de início da incapacidade (se houver)", value=processo.get("data_inicio", date.today()))
+    data_fim = st.date_input("Data provável de término (se houver)", value=processo.get("data_fim", date.today()))
+
+    st.markdown("### ✉️ Resposta aos Quesitos")
+    quesitos = st.text_area("Transcreva ou cole aqui as respostas aos quesitos", value=processo.get("quesitos", ""))
+
+    st.markdown("### 📝 Conclusão")
+    conclusao = st.text_area("Conclusão do perito com base nos dados acima", value=processo.get("conclusao", ""))
+
+    if st.button("💾 Salvar Laudo"):
+        processo["nome"] = nome
+        processo["data_nascimento"] = str(data_nascimento)
+        processo["profissao"] = profissao
+        processo["cid"] = cid
+        processo["anamnese"] = anamnese
+        processo["exame_fisico"] = exame_fisico
+        processo["documentos"] = documentos
+        processo["incapacidade"] = incapacidade
+        processo["data_inicio"] = str(data_inicio)
+        processo["data_fim"] = str(data_fim)
+        processo["quesitos"] = quesitos
+        processo["conclusao"] = conclusao
+        st.success("Laudo salvo com sucesso.")
+        st.session_state.view = "processos"
+        st.rerun()
+
 
 if __name__ == "__main__":
     main()
