@@ -787,6 +787,10 @@ def main():
                     st.session_state.current_local_filter = None
                     st.session_state.show_estaduais_management = False
                     st.session_state.selected_date_local = None
+
+                # Botão para Configurações
+                if st.button("⚙️ Configurações"):
+                    st.session_state.pagina = "configuracoes"
         
         # Verificar qual tela mostrar
         if st.session_state.selected_date_local:
@@ -794,7 +798,10 @@ def main():
                 data_iso = st.session_state.selected_date_local["data"]
                 local_name = st.session_state.selected_date_local["local"]
                 show_processos_view(data_iso, local_name)
-        
+
+        elif hasattr(st.session_state, "pagina") and st.session_state.pagina == "configuracoes":
+            gerenciar_configuracoes()
+
         elif st.session_state.show_estaduais_management and user_info['role'] == 'administrador':
             # Gerenciamento de locais estaduais
             st.markdown("### 🏛️ Gerenciar Locais Estaduais")
@@ -1454,9 +1461,11 @@ def editar_laudo_ad(processo):
             key="modelo_exame_fisico",
             label_visibility="visible"
         )
+        # Nova lógica para atualizar resultado_exame_fisico conforme instrução
         if modelo_selecionado and modelo_selecionado != "+Novo modelo":
-            if modelo_selecionado in modelos_exame_clinico:
-                st.session_state.resultado_exame_fisico = modelos_exame_clinico[modelo_selecionado]
+            st.session_state.resultado_exame_fisico = modelos_exame_clinico[modelo_selecionado]
+        elif modelo_selecionado == "+Novo modelo":
+            st.session_state.resultado_exame_fisico = ""
         # ============================ FIM SEÇÃO EXAME FÍSICO REORGANIZADA ============================
 
         # === NOVA SEÇÃO DE PATOLOGIA - BLOCO ATUALIZADO ===
@@ -1576,3 +1585,18 @@ def gerar_laudo_ad(processo):
     return True
 
 # ======= FIM DO ARQUIVO laudos_ad.py =======
+
+# ======= FIM DO ARQUIVO laudos_ad.py =======
+
+# ======= Função de gerenciamento de configurações =======
+def gerenciar_configuracoes():
+    st.title("⚙️ Configurações do Sistema")
+    aba = st.radio("Escolha uma categoria para configurar:", ["Modelos de Exame Clínico", "Modelos de Patologias"])
+
+    if aba == "Modelos de Exame Clínico":
+        st.subheader("Modelos de Exame Clínico")
+        st.info("Função de gerenciamento de modelos de exame clínico em desenvolvimento.")
+
+    elif aba == "Modelos de Patologias":
+        st.subheader("Modelos de Patologias")
+        st.info("Função de gerenciamento de modelos de patologias em desenvolvimento.")
