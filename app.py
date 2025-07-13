@@ -985,7 +985,7 @@ def main():
             # Visualização específica do local
             show_local_specific_view(st.session_state.current_local_filter)
         
-        elif menu_selecionado == "⚙️ Configurações":
+        elif menu_selecionado.strip() == "⚙️ Configurações":
             gerenciar_configuracoes()
         else:
             # Interface principal - calendário
