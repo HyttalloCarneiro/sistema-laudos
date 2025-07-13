@@ -1434,22 +1434,24 @@ def editar_laudo_ad(processo):
             key="resultado_exame_fisico",
             height=150
         )
-        # Adiciona rótulo abaixo da caixa de texto com menor espaçamento
-        st.markdown('<p style="margin-bottom: 0.1rem; margin-top: 0.25rem; font-size: 0.85rem;">Escolha um modelo</p>', unsafe_allow_html=True)
+        # Localização: Selectbox de modelos com rótulo junto (label_visibility="visible") e texto em português
         modelos_exame_clinico = {
             "Dor lombar (Lombalgia)": "Paciente apresenta dor à palpação em região lombossacral, com rigidez matinal e leve limitação à flexão lombar. Teste de Lasègue negativo. Marcha preservada.",
             "Transtorno depressivo (Depressão)": "Paciente relata humor deprimido, anedonia, distúrbios de sono e apetite. Apresenta-se orientado, mas com lentificação psicomotora e olhar cabisbaixo. Não há sinais psicóticos.",
             "Artrose de joelho": "Paciente deambula com claudicação leve. Dor à palpação em interlinha articular medial de joelho direito, com crepitação e limitação na extensão. Sem sinais flogísticos."
         }
-        # Selectbox de modelos, largura reduzida à metade e espaçamento correto
-        col_mod, _ = st.columns([1,1])
-        with col_mod:
-            modelo_selecionado = st.selectbox(
-                "",
-                [*modelos_exame_clinico.keys(), "+Novo modelo"],
-                key="modelo_exame_fisico"
-            )
-        # Corrige erro de acesso ao dicionário
+        opcoes_modelos = [*modelos_exame_clinico.keys(), "+Novo modelo"]
+        indice_modelo = 0  # Padrão: primeiro modelo
+        # Se já selecionado, manter seleção
+        if "modelo_exame_fisico" in st.session_state and st.session_state.modelo_exame_fisico in opcoes_modelos:
+            indice_modelo = opcoes_modelos.index(st.session_state.modelo_exame_fisico)
+        modelo_selecionado = st.selectbox(
+            "Escolha um modelo",
+            opcoes_modelos,
+            index=indice_modelo,
+            key="modelo_exame_fisico",
+            label_visibility="visible"
+        )
         if modelo_selecionado and modelo_selecionado != "+Novo modelo":
             if modelo_selecionado in modelos_exame_clinico:
                 st.session_state.resultado_exame_fisico = modelos_exame_clinico[modelo_selecionado]
