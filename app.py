@@ -1278,6 +1278,9 @@ def editar_laudo_ad(processo):
     idade = processo.get("idade", None)
     tipo = processo.get("tipo", "AD")
     historico_beneficios = processo.get("historico_beneficios", [])
+    # Garantir que a chave 'der' exista, mesmo que None por padrão
+    if "der" not in processo:
+        processo["der"] = None
     data_str = processo.get("data", processo.get("data_pericia", None))
     hora = processo.get("horario", "")
     # data_str pode estar em vários campos, tentar obter da chave do processo se necessário
@@ -1346,16 +1349,16 @@ def editar_laudo_ad(processo):
             st.markdown("**Data de nascimento:** -")
         st.markdown(f"**Idade:** {idade if idade is not None else '-'} anos")
         st.markdown(f"**Tipo:** {tipo}")
-        # DER
-        der_data = processo.get("der", "")
+        # DER (Data de Entrada do Requerimento)
+        der_data = processo.get("der")
         if der_data:
             try:
                 der_formatada = datetime.strptime(der_data, "%Y-%m-%d").strftime("%d-%m-%Y")
-            except ValueError:
+            except Exception:
                 der_formatada = der_data
-            st.markdown(f"**DER:** {der_formatada}")
         else:
-            st.markdown("**DER:** -")
+            der_formatada = "-"
+        st.markdown(f"**DER:** {der_formatada}")
         st.markdown("**Histórico de benefícios:**")
         if historico_beneficios:
             for item in historico_beneficios:
