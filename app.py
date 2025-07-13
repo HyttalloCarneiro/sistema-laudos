@@ -986,7 +986,8 @@ def main():
             show_local_specific_view(st.session_state.current_local_filter)
         
         elif menu_selecionado.strip() == "⚙️ Configurações":
-            gerenciar_configuracoes()
+            st.subheader("Configurações")
+            st.info("Área em construção: aqui você poderá gerenciar modelos de exame clínico e patologias mais usuais.")
         else:
             # Interface principal - calendário
             tab1, tab2 = st.tabs(["📅 Calendário e Perícias", "📋 Gerenciar Perícias"])
