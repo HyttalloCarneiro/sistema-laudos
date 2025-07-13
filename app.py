@@ -616,7 +616,7 @@ def show_processos_view(data_iso, local_name):
                                         }
                                         break
                                 st.success("✅ Processo atualizado com sucesso!")
-                                st.rerun()
+                                st.experimental_rerun()
                         with col2:
                             # Exclusão já disponível acima, pode omitir
                             pass
