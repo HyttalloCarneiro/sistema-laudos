@@ -1025,7 +1025,7 @@ def main():
             # Visualização específica do local
             show_local_specific_view(st.session_state.current_local_filter)
         
-        elif menu_selecionado.strip() == "⚙️ Configurações":
+        elif "Configurações" in menu_selecionado:
             st.markdown("## ⚙️ Configurações do Sistema")
             categoria = st.radio("Escolha uma categoria para gerenciar:", ["Modelos de Exame Clínico", "Modelos de Patologias"])
 
