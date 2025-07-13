@@ -577,29 +577,14 @@ def show_processos_view(data_iso, local_name):
         # Bloco: Ações em Lote
         st.markdown("### 🧾 Ações em Lote")
         if st.button("🛠️ Gerar Lote de Pré-Laudos"):
-            # Função gerar_laudo_ad incorporada diretamente
-            def gerar_laudo_ad(processo):
-                import os
-                from datetime import datetime
-                from PyPDF2 import PdfReader
-                import streamlit as st
-                # Exemplo de implementação de geração de laudo AD
-                # Adaptar conforme necessário
-                st.write("Gerando laudo AD para o processo:", processo.get("numero_processo", "N/A"))
-                # Aqui você pode adicionar o processamento real
-                # Exemplo: salvar um arquivo PDF, processar informações, etc.
-                # Para fins didáticos, apenas simula uma geração
-                processo["anexo_status"] = "Pronto"
-                return True
-
             for processo in processos_ordenados:
-                if processo.get("tipo") == "AD":
-                    st.write("Função gerar_laudo_ad chamada para o processo:", processo)
-                    gerar_laudo_ad(processo)
-                    st.success("Laudo gerado com sucesso!")
-                    processo["status"] = "Pronto"
-                    if "pdf_path" in processo and os.path.exists(processo["pdf_path"]):
-                        os.remove(processo["pdf_path"])
+                if processo["tipo"] == "AD":
+                    laudo = gerar_laudo_ad(processo=processo)
+                    processo["laudo"] = laudo
+                    processo["situacao"] = "Pronto"
+                    if "arquivo" in processo:
+                        os.remove(processo["arquivo"])
+                        del processo["arquivo"]
             st.success("✅ Lote de pré-laudos gerado com sucesso!")
             st.rerun()
 
