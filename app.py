@@ -6,7 +6,16 @@ import os
 sys.path.append(os.path.join(os.path.dirname(__file__), 'pages'))
 import streamlit as st
 # from configuracoes import exibir_configuracoes
-from configuracoes import gerenciar_configuracoes
+try:
+    from configuracoes import exibir_configuracoes
+except ImportError:
+    def exibir_configuracoes():
+        st.error("Erro ao carregar configurações. Verifique se o arquivo 'configuracoes.py' está presente.")
+try:
+    from configuracoes import gerenciar_configuracoes
+except ImportError:
+    def gerenciar_configuracoes():
+        st.error("Erro ao carregar gerenciamento de configurações. Verifique se o arquivo 'configuracoes.py' está presente.")
 import fitz  # PyMuPDF
 import pandas as pd
 import calendar
@@ -987,8 +996,13 @@ def main():
             # Visualização específica do local
             show_local_specific_view(st.session_state.current_local_filter)
         
-        elif "⚙️ Configurações" in menu_selecionado:
-            st.subheader("Configurações (em construção)")
+        elif 'menu_selecionado' in locals() or 'menu_selecionado' in globals():
+            if 'menu_selecionado' in locals():
+                _menu = menu_selecionado
+            else:
+                _menu = globals().get('menu_selecionado', '')
+            if _menu.strip() == "⚙️ Configurações":
+                exibir_configuracoes()
 
 def editar_laudo_ad(processo):
     """Renderiza a tela de redação do laudo AD em duas colunas, com informações do periciando à esquerda."""
