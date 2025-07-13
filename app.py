@@ -1045,6 +1045,8 @@ def main():
                 st.session_state["menu"] = "menu_principal"
                 st.experimental_rerun()
         else:
+            st.session_state['pagina'] = 'calendario'
+            st.experimental_rerun()
             # Interface principal - calendário
             tab1, tab2 = st.tabs(["📅 Calendário e Perícias", "📋 Gerenciar Perícias"])
             
