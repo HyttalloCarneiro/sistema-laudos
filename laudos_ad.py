@@ -42,7 +42,11 @@ def redigir_laudo_interface():
 
 # Função para gerar laudo automaticamente conforme padrões da 17ª Vara
 def gerar_laudo_ad(texto_extraido, nome_parte):
-    return f"""LAUDO MÉDICO PERICIAL - AUXÍLIO-DOENÇA
+    st.write("Executando gerar_laudo_ad")
+    st.write("Nome da parte:", nome_parte)
+    st.write("Texto extraído:", texto_extraido)
+
+    laudo = f"""LAUDO MÉDICO PERICIAL - AUXÍLIO-DOENÇA
 
 Autor: {nome_parte}
 
@@ -60,5 +64,7 @@ Conclusão:
 
 Este laudo foi gerado automaticamente com base nos padrões da 17ª Vara Federal.
 """
+    st.success("Laudo gerado com sucesso!")
+    return laudo
 
 __all__ = ["gerar_laudo_ad", "redigir_laudo_interface"]
