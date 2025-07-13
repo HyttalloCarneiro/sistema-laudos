@@ -1466,6 +1466,17 @@ def editar_laudo_ad(processo):
                 st.session_state.patologias.append(selected_pat)
                 st.experimental_rerun()
 
+        # --- Adição de nova patologia extra ---
+        st.markdown("#### Adicionar Patologia Extra")
+        nova_patologia = st.text_input("Outra patologia (descreva)", key="nova_patologia_input")
+        if st.button("Adicionar Patologia Extra"):
+            # Ensure the list is initialized before appending
+            if "patologias_adicionais" not in st.session_state:
+                st.session_state.patologias_adicionais = []
+            if nova_patologia and nova_patologia not in st.session_state.patologias_adicionais:
+                st.session_state.patologias_adicionais.append(nova_patologia)
+                st.experimental_rerun()
+
         # === FIM DA SEÇÃO DE PATOLOGIA ===
 
         st.markdown("### 📆 Incapacidade")
