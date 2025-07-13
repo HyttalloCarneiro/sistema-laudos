@@ -1358,7 +1358,7 @@ def editar_laudo_ad(processo):
     with col_dir:
         # Campos principais do laudo (mantendo campos editáveis)
         profissao = processo.get("profissao", "")
-        # cid = processo.get("cid", "")
+        cid = processo.get("cid", "")
         anamnese = processo.get("anamnese", "")
         exame_fisico = processo.get("exame_fisico", "")
         documentos_texto = processo.get("documentos", "")
@@ -1368,28 +1368,11 @@ def editar_laudo_ad(processo):
         quesitos = processo.get("quesitos", "")
         conclusao = processo.get("conclusao", "")
 
-        # Novo: campo escolaridade, logo abaixo de profissão
-        escolaridade_opcoes = [
-            "Analfabeto",
-            "Apenas assina o nome",
-            "Ensino fundamental incompleto",
-            "Ensino fundamental completo",
-            "Ensino médio incompleto",
-            "Ensino médio completo",
-            "Ensino superior incompleto",
-            "Ensino superior completo"
-        ]
-        # Recuperar escolaridade se já salva
-        escolaridade = processo.get("escolaridade", escolaridade_opcoes[0])
-
-        # Profissão e Escolaridade alinhados à direita
         col1, col2 = st.columns(2)
         with col1:
             st.text_input("Profissão", profissao or "", key="profissao")
-            st.selectbox("Escolaridade", escolaridade_opcoes, key="escolaridade", index=escolaridade_opcoes.index(escolaridade) if escolaridade in escolaridade_opcoes else 0)
         with col2:
-            # Substituído campo "CID(s) relacionado(s)" por "Histórico laboral"
-            st.text_area("Histórico laboral", value=processo.get("historico_laboral", ""), key="historico_laboral", height=60)
+            st.text_input("Histórico laboral", cid or "", key="cid")
 
         st.markdown("### 🩺 Anamnese")
         st.text_area(
