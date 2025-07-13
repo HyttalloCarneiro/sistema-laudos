@@ -1436,7 +1436,7 @@ def editar_laudo_ad(processo):
         )
         # Adiciona rótulo abaixo da caixa de texto
         # Localiza a seção do rótulo "Escolha um modelo" e substitui pelo markdown customizado
-        st.markdown('<p style="font-size: 14px; margin-bottom: 4px;">Escolha um modelo</p>', unsafe_allow_html=True)
+        st.markdown('<p style="margin-top: 0.25rem; font-size: 0.85rem;">Escolha um modelo</p>', unsafe_allow_html=True)
         modelos_exame_clinico = {
             "Dor lombar (Lombalgia)": "Paciente apresenta dor à palpação em região lombossacral, com rigidez matinal e leve limitação à flexão lombar. Teste de Lasègue negativo. Marcha preservada.",
             "Transtorno depressivo (Depressão)": "Paciente relata humor deprimido, anedonia, distúrbios de sono e apetite. Apresenta-se orientado, mas com lentificação psicomotora e olhar cabisbaixo. Não há sinais psicóticos.",
