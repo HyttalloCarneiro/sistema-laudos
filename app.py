@@ -1590,8 +1590,9 @@ def gerar_laudo_ad(processo):
 
 
 
-# Função de gerenciamento de configurações (após as funções de navegação, como gerenciar_usuarios)
+
+# Definição da função gerenciar_configuracoes conforme solicitado:
 def gerenciar_configuracoes():
-    st.markdown("## ⚙️ Configurações")
-    st.write("Área para gerenciar modelos de exame clínico e patologias usuais.")
-    # Conteúdo temporário enquanto a interface não é finalizada
+    import streamlit as st
+    st.subheader("⚙️ Configurações")
+    st.info("Área reservada para gerenciamento de modelos de exame clínico e patologias mais usuais (em construção).")
