@@ -1431,8 +1431,21 @@ def editar_laudo_ad(processo):
         st.markdown("### 🧪 Exame Físico")
         st.text_area(
             "Resultado do exame físico realizado",
-            exame_fisico or "", height=120, key="exame_fisico"
+            key="resultado_exame_fisico",
+            height=150
         )
+
+        # Modelos prontos para exame clínico
+        modelos_exame_clinico = {
+            "Dor lombar (Lombalgia)": "Paciente apresenta dor à palpação em região lombossacral, com rigidez matinal e leve limitação à flexão lombar. Teste de Lasègue negativo. Marcha preservada.",
+            "Transtorno depressivo (Depressão)": "Paciente relata humor deprimido, anedonia, distúrbios de sono e apetite. Apresenta-se orientado, mas com lentificação psicomotora e olhar cabisbaixo. Não há sinais psicóticos.",
+            "Artrose de joelho": "Paciente deambula com claudicação leve. Dor à palpação em interlinha articular medial de joelho direito, com crepitação e limitação na extensão. Sem sinais flogísticos."
+        }
+        st.markdown("#### 📑 Selecionar modelo de exame clínico")
+        modelo_selecionado = st.selectbox("Escolha um modelo", ["", *modelos_exame_clinico.keys(), "+Novo modelo"])
+        if modelo_selecionado and modelo_selecionado != "+Novo modelo":
+            st.session_state.resultado_exame_fisico = modelos_exame_clinico[modelo_selecionado]
+        # TODO: permitir cadastrar novo modelo
 
         # === NOVA SEÇÃO DE PATOLOGIA - BLOCO ATUALIZADO ===
         # Inicializa a lista de patologias, se ainda não existir
