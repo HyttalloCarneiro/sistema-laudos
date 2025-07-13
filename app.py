@@ -1434,50 +1434,54 @@ def editar_laudo_ad(processo):
             exame_fisico or "", height=120, key="exame_fisico"
         )
 
-        # === NOVA SEÇÃO DE PATOLOGIA ===
-        st.markdown("### 🩺 Patologia")
+        # === NOVA SEÇÃO DE PATOLOGIA - BLOCO ATUALIZADO ===
+        # Inicializa a lista de patologias, se ainda não existir
+        if "patologias_identificadas" not in st.session_state:
+            st.session_state.patologias_identificadas = []
 
-        if "patologias" not in st.session_state:
-            # Inicializar com processo, se houver
-            st.session_state.patologias = list(processo.get("patologias", [])) if processo.get("patologias") else []
+        # Carrega base de patologias pré-cadastradas
+        with open("data/patologias.json", "r", encoding="utf-8") as f:
+            base_patologias = json.load(f)
 
-        if "patologias_disponiveis" not in st.session_state:
-            st.session_state.patologias_disponiveis = [
-                "Transtorno de disco intervertebral (CID M51)",
-                "Lombalgia (CID M54)",
-                "Artrose de joelho (CID M17)",
-                "Depressão (CID F32)",
-                "Outros"
-            ]
-
-        # Listar patologias atuais
-        for i, pat in enumerate(st.session_state.patologias):
-            colp1, colp2 = st.columns([8, 1])
-            with colp1:
+        # Exibir lista de patologias já inseridas
+        st.markdown("### 🧬 Patologia")
+        for idx, pat in enumerate(st.session_state.patologias_identificadas):
+            col1, col2 = st.columns([0.9, 0.1])
+            with col1:
                 st.write(f"- {pat}")
-            with colp2:
-                if st.button("❌", key=f"del_pat_{i}"):
-                    st.session_state.patologias.pop(i)
+            with col2:
+                if st.button("❌", key=f"del_pat_{idx}"):
+                    st.session_state.patologias_identificadas.pop(idx)
                     st.experimental_rerun()
 
-        selected_pat = st.selectbox("Adicionar nova patologia", st.session_state.patologias_disponiveis)
-        if st.button("Adicionar Patologia"):
-            if selected_pat and selected_pat not in st.session_state.patologias:
-                st.session_state.patologias.append(selected_pat)
-                st.experimental_rerun()
+        # Opção de adicionar nova
+        patologias_disponiveis = [f"{p['nome']} (CID {p['cid']})" for p in base_patologias]
+        patologias_disponiveis.append("+ Incluir nova patologia")
+        nova_patologia_selecionada = st.selectbox("Adicionar nova patologia", patologias_disponiveis)
 
-        # --- Adição de nova patologia extra ---
-        st.markdown("#### Adicionar Patologia Extra")
-        nova_patologia = st.text_input("Outra patologia (descreva)", key="nova_patologia_input")
-        if st.button("Adicionar Patologia Extra"):
-            # Certifique-se de inicializar a lista de patologias no laudo (processo) se não existir
-            if "patologias" not in processo:
-                processo["patologias"] = []
-            # Adiciona se não for duplicada
-            if nova_patologia and nova_patologia not in processo["patologias"]:
-                processo["patologias"].append(nova_patologia)
-            st.experimental_rerun()
-
+        if nova_patologia_selecionada == "+ Incluir nova patologia":
+            with st.form("form_nova_patologia"):
+                nome = st.text_input("Nome da patologia")
+                cid = st.text_input("CID")
+                definicao = st.text_area("Definição técnica (não será exibida na interface)")
+                submitted = st.form_submit_button("Salvar")
+                if submitted:
+                    nova = {
+                        "nome": nome,
+                        "cid": cid,
+                        "definicao": definicao
+                    }
+                    base_patologias.append(nova)
+                    with open("data/patologias.json", "w", encoding="utf-8") as f:
+                        json.dump(base_patologias, f, ensure_ascii=False, indent=2)
+                    st.session_state.patologias_identificadas.append(f"{nome} (CID {cid})")
+                    st.success("Patologia adicionada com sucesso.")
+                    st.experimental_rerun()
+        else:
+            if st.button("Adicionar Patologia"):
+                if nova_patologia_selecionada not in st.session_state.patologias_identificadas:
+                    st.session_state.patologias_identificadas.append(nova_patologia_selecionada)
+                    st.experimental_rerun()
         # === FIM DA SEÇÃO DE PATOLOGIA ===
 
         st.markdown("### 📆 Incapacidade")
