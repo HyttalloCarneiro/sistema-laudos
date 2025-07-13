@@ -1588,15 +1588,14 @@ def gerar_laudo_ad(processo):
 
 # ======= FIM DO ARQUIVO laudos_ad.py =======
 
+
 # ======= Função de gerenciamento de configurações =======
 def gerenciar_configuracoes():
-    st.title("⚙️ Configurações do Sistema")
-    aba = st.radio("Escolha uma categoria para configurar:", ["Modelos de Exame Clínico", "Modelos de Patologias"])
+    st.markdown("## ⚙️ Configurações")
+    st.markdown("Área destinada à gestão de modelos de exames clínicos e modelos de patologias.")
+    aba = st.radio("Escolha uma categoria para gerenciar:", ["Modelos de Exame Clínico", "Modelos de Patologias"])
 
     if aba == "Modelos de Exame Clínico":
-        st.subheader("Modelos de Exame Clínico")
-        st.info("Função de gerenciamento de modelos de exame clínico em desenvolvimento.")
-
+        st.info("Em breve: Área para gerenciar os modelos de exame clínico.")
     elif aba == "Modelos de Patologias":
-        st.subheader("Modelos de Patologias")
-        st.info("Função de gerenciamento de modelos de patologias em desenvolvimento.")
+        st.info("Em breve: Área para gerenciar os modelos de patologias.")
