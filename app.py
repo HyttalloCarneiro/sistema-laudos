@@ -4,6 +4,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), 'pages'))
 import sys
 import os
 sys.path.append(os.path.join(os.path.dirname(__file__), 'pages'))
+from funcoes.configuracoes import gerenciar_configuracoes
 import streamlit as st
 import fitz  # PyMuPDF
 import pandas as pd
@@ -985,6 +986,8 @@ def main():
             # Visualização específica do local
             show_local_specific_view(st.session_state.current_local_filter)
         
+        elif menu_selecionado == "⚙️ Configurações":
+            gerenciar_configuracoes()
         else:
             # Interface principal - calendário
             tab1, tab2 = st.tabs(["📅 Calendário e Perícias", "📋 Gerenciar Perícias"])
