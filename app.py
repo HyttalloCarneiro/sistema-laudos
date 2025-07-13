@@ -10,7 +10,7 @@ import json
 import locale
 
 # Ajuste dos imports dos módulos das páginas
-from pages.laudos_ad import redigir_lote_pre_laudos
+from laudos_ad import gerar_laudo_ad
 
 # Configuração da página
 st.set_page_config(
@@ -576,7 +576,7 @@ def show_processos_view(data_iso, local_name):
         st.markdown("### 🧾 Ações em Lote")
         if st.button("🛠️ Gerar Lote de Pré-Laudos"):
             # Utiliza a função de lote de pré-laudos do laudos_ad.py
-            redigir_lote_pre_laudos(processos_ordenados)
+            gerar_laudo_ad(processos_ordenados)
             st.success("✅ Lote de pré-laudos gerado com sucesso!")
             st.rerun()
 
