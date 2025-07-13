@@ -1,0 +1,1 @@
+# Este arquivo torna a pasta pages um pacote Python válido.
