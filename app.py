@@ -1404,6 +1404,24 @@ def editar_laudo_ad(processo):
         with col2:
             st.text_input("Histórico laboral", cid or "", key="cid")
 
+        # ====== CAMPO ESCOLARIDADE ADICIONADO AQUI ======
+        escolaridade = col2.selectbox(
+            "Escolaridade",
+            [
+                "Analfabeto",
+                "Apenas assina o nome",
+                "Ensino fundamental incompleto",
+                "Ensino fundamental completo",
+                "Ensino médio incompleto",
+                "Ensino médio completo",
+                "Ensino superior incompleto",
+                "Ensino superior completo"
+            ],
+            index=None,
+            placeholder="Selecione a escolaridade"
+        )
+        # ====== FIM DO CAMPO ESCOLARIDADE ======
+
         st.markdown("### 🩺 Anamnese")
         st.text_area(
             "Descreva os dados clínicos e históricos relevantes",
