@@ -1326,10 +1326,20 @@ def editar_laudo_ad(processo):
     else:
         data_nascimento_dt = None
     # Cabeçalho principal
-    if data:
-        st.markdown(f"## 📝 {tipo} - {data.strftime('%d-%m-%Y')} - {hora}")
+    # Formatar data para DD/MM/YYYY para exibição no título
+    if data_str and isinstance(data_str, str):
+        try:
+            data_formatada = datetime.strptime(data_str, "%Y-%m-%d").strftime("%d/%m/%Y")
+        except Exception:
+            try:
+                data_formatada = datetime.strptime(data_str, "%d-%m-%Y").strftime("%d/%m/%Y")
+            except Exception:
+                data_formatada = data_str
+    elif data:
+        data_formatada = data.strftime("%d/%m/%Y")
     else:
-        st.markdown(f"## 📝 {tipo} - {hora}")
+        data_formatada = "-"
+    st.markdown(f"### ✍️ {tipo} - {data_formatada} - {hora}")
     st.markdown("---")
     # Botão para voltar
     if st.button("⬅️ Voltar para Processos do Dia"):
