@@ -1428,67 +1428,37 @@ def editar_laudo_ad(processo):
             anamnese or "", height=120, key="anamnese"
         )
 
+        # ============================ INÍCIO SEÇÃO EXAME FÍSICO REORGANIZADA ============================
         st.markdown("### 🧪 Exame Físico")
-        # Carregar modelos do arquivo, se existir, senão usar padrão
-        modelos_exame_clinico_path = "data/modelos_exame_clinico.json"
-        if os.path.exists(modelos_exame_clinico_path):
-            with open(modelos_exame_clinico_path, "r", encoding="utf-8") as f:
-                modelos_exame_clinico = json.load(f)
-        else:
-            modelos_exame_clinico = {
-                "Dor lombar (Lombalgia)": "Paciente apresenta dor à palpação em região lombossacral, com rigidez matinal e leve limitação à flexão lombar. Teste de Lasègue negativo. Marcha preservada.",
-                "Transtorno depressivo (Depressão)": "Paciente relata humor deprimido, anedonia, distúrbios de sono e apetite. Apresenta-se orientado, mas com lentificação psicomotora e olhar cabisbaixo. Não há sinais psicóticos.",
-                "Artrose de joelho": "Paciente deambula com claudicação leve. Dor à palpação em interlinha articular medial de joelho direito, com crepitação e limitação na extensão. Sem sinais flogísticos."
-            }
-        opcoes_modelos = [*modelos_exame_clinico.keys(), "+Novo modelo"]
-        indice_modelo = 0  # Padrão: primeiro modelo
-        if "modelo_exame_fisico" in st.session_state and st.session_state.modelo_exame_fisico in opcoes_modelos:
-            indice_modelo = opcoes_modelos.index(st.session_state.modelo_exame_fisico)
-        # Localização: Selectbox de modelos com rótulo junto (label_visibility="visible") e texto em português
-        st.markdown("#### Modelo de Exame Clínico")
-        col1, col2 = st.columns([2, 1])
-        with col1:
-            modelo_selecionado = st.selectbox(
-                "Escolha um modelo",
-                opcoes_modelos,
-                index=indice_modelo,
-                key="modelo_exame_clinico",
-                label_visibility="visible"
-            )
-        with col2:
-            if st.button("Editar/Excluir modelo"):
-                st.session_state.editar_modelo_exame = True
-
-        # Atualizar texto do exame físico ao selecionar modelo
-        if modelo_selecionado and modelo_selecionado != "+Novo modelo":
-            if modelo_selecionado in modelos_exame_clinico:
-                st.session_state.resultado_exame_fisico = modelos_exame_clinico[modelo_selecionado]
-
-        # Bloco de edição/remoção do modelo
-        if st.session_state.get("editar_modelo_exame"):
-            st.text_area("Editar conteúdo do modelo", value=st.session_state.resultado_exame_fisico, key="edicao_modelo_conteudo", height=200)
-            col_salvar, col_excluir = st.columns(2)
-            with col_salvar:
-                if st.button("Salvar alterações"):
-                    modelos_exame_clinico[st.session_state.modelo_exame_clinico] = st.session_state.edicao_modelo_conteudo
-                    salvar_modelos_exame_clinico(modelos_exame_clinico)
-                    st.success("Modelo atualizado com sucesso.")
-                    st.session_state.editar_modelo_exame = False
-                    st.experimental_rerun()
-            with col_excluir:
-                if st.button("Excluir modelo"):
-                    if st.session_state.modelo_exame_clinico in modelos_exame_clinico:
-                        del modelos_exame_clinico[st.session_state.modelo_exame_clinico]
-                        salvar_modelos_exame_clinico(modelos_exame_clinico)
-                        st.success("Modelo excluído com sucesso.")
-                        st.session_state.editar_modelo_exame = False
-                        st.experimental_rerun()
-
+        # 1. Campo de texto "Resultado do exame físico realizado"
         st.text_area(
             "Resultado do exame físico realizado",
             key="resultado_exame_fisico",
             height=150
         )
+        # 2. Subtítulo "Escolha um modelo" e selectbox de modelos logo abaixo
+        st.markdown("#### Escolha um modelo")
+        modelos_exame_clinico = {
+            "Dor lombar (Lombalgia)": "Paciente apresenta dor à palpação em região lombossacral, com rigidez matinal e leve limitação à flexão lombar. Teste de Lasègue negativo. Marcha preservada.",
+            "Transtorno depressivo (Depressão)": "Paciente relata humor deprimido, anedonia, distúrbios de sono e apetite. Apresenta-se orientado, mas com lentificação psicomotora e olhar cabisbaixo. Não há sinais psicóticos.",
+            "Artrose de joelho": "Paciente deambula com claudicação leve. Dor à palpação em interlinha articular medial de joelho direito, com crepitação e limitação na extensão. Sem sinais flogísticos."
+        }
+        opcoes_modelos = [*modelos_exame_clinico.keys(), "+Novo modelo"]
+        indice_modelo = 0  # Padrão: primeiro modelo
+        # Se já selecionado, manter seleção
+        if "modelo_exame_fisico" in st.session_state and st.session_state.modelo_exame_fisico in opcoes_modelos:
+            indice_modelo = opcoes_modelos.index(st.session_state.modelo_exame_fisico)
+        modelo_selecionado = st.selectbox(
+            "Escolha um modelo",
+            opcoes_modelos,
+            index=indice_modelo,
+            key="modelo_exame_fisico",
+            label_visibility="visible"
+        )
+        if modelo_selecionado and modelo_selecionado != "+Novo modelo":
+            if modelo_selecionado in modelos_exame_clinico:
+                st.session_state.resultado_exame_fisico = modelos_exame_clinico[modelo_selecionado]
+        # ============================ FIM SEÇÃO EXAME FÍSICO REORGANIZADA ============================
 
         # === NOVA SEÇÃO DE PATOLOGIA - BLOCO ATUALIZADO ===
         # Inicializa a lista de patologias, se ainda não existir
@@ -1607,8 +1577,3 @@ def gerar_laudo_ad(processo):
     return True
 
 # ======= FIM DO ARQUIVO laudos_ad.py =======
-
-# Função para salvar modelos de exame clínico
-def salvar_modelos_exame_clinico(modelos):
-    with open("data/modelos_exame_clinico.json", "w", encoding="utf-8") as f:
-        json.dump(modelos, f, ensure_ascii=False, indent=2)
