@@ -496,25 +496,71 @@ def show_processos_view(data_iso, local_name):
             row_cols[3].write(processo['nome_parte'])
             row_cols[4].write(processo['tipo'].split('(')[-1].replace(')', ''))
             row_cols[5].write(processo['situacao'])
-        # Novo bloco unificado de botões de ação
-        with row_cols[6]:
-            col_a, col_b, col_c = st.columns([1, 1, 1])
+            # Novo bloco unificado de botões de ação
+            with row_cols[6]:
+                col_a, col_b, col_c = st.columns([1, 1, 1])
 
-            # Removido botão de redigir laudo (📝) e checagem de tipo de processo
-            with col_a:
-                # Substituição da chamada para redigir_laudo_interface(dados) por redigir_laudo_interface()
-                if st.button("📝", key=f"redigir_{key_processos}_{idx}"):
-                    redigir_laudo_interface()
+                # Removido botão de redigir laudo (📝) e checagem de tipo de processo
+                with col_a:
+                    # Substituição da chamada para redigir_laudo_interface(dados) por redigir_laudo_interface()
+                    if st.button("📝", key=f"redigir_{key_processos}_{idx}"):
+                        # Localize o local onde são exibidas as informações de um processo selecionado.
+                        # Imediatamente após a verificação de que o processo está com anexado == "Pronto" e tipo == "AD", adicione interface de edição do laudo:
+                        if processo.get("anexo_status") == "Pronto" and (processo.get("tipo") == "AD" or processo.get("tipo") == "Auxílio Doença (AD)"):
+                            st.markdown("## ✍️ Edição do Laudo Auxílio-Doença")
 
-            with col_b:
-                if st.button("🚫", key=f"ausente_{key_processos}_{idx}"):
-                    st.session_state.confirm_action = ("ausencia", key_processos, processo)
-                    st.rerun()
+                            col1_, col2_ = st.columns(2)
+                            with col1_:
+                                nome = st.text_input("Nome do Periciando", value=processo.get("nome", processo.get("nome_parte", "")), key=f"nome_{key_processos}_{idx}")
+                                data_nascimento = st.date_input("Data de nascimento", key=f"data_nasc_{key_processos}_{idx}")
 
-            with col_c:
-                if st.button("🗑️", key=f"excluir_{key_processos}_{idx}"):
-                    st.session_state.confirm_action = ("excluir", key_processos, processo)
-                    st.rerun()
+                            with col2_:
+                                profissao = st.text_input("Profissão", value=processo.get("profissao", ""), key=f"profissao_{key_processos}_{idx}")
+                                cid = st.text_input("CID(s) relacionado(s)", value=processo.get("cid", ""), key=f"cid_{key_processos}_{idx}")
+
+                            st.markdown("### 🩺 Anamnese")
+                            anamnese = st.text_area("Descreva os dados clínicos e históricos relevantes", value=processo.get("anamnese", ""), key=f"anamnese_{key_processos}_{idx}")
+
+                            st.markdown("### 🧪 Exame Físico")
+                            exame_fisico = st.text_area("Resultado do exame físico realizado", value=processo.get("exame_fisico", ""), key=f"exame_fisico_{key_processos}_{idx}")
+
+                            st.markdown("### 📁 Documentos Apresentados")
+                            documentos = st.text_area("Laudos, exames e atestados apresentados", value=processo.get("documentos", ""), key=f"documentos_{key_processos}_{idx}")
+
+                            st.markdown("### 📆 Incapacidade")
+                            incapacidade = st.selectbox("Houve incapacidade laboral?", ["Sim", "Não", "Parcial", "Permanente"], key=f"incapacidade_{key_processos}_{idx}", index=["Sim", "Não", "Parcial", "Permanente"].index(processo.get("incapacidade", "Sim")) if processo.get("incapacidade") in ["Sim", "Não", "Parcial", "Permanente"] else 0)
+                            data_inicio = st.date_input("Data de início da incapacidade (se houver)", key=f"data_inicio_{key_processos}_{idx}")
+                            data_fim = st.date_input("Data provável de término (se houver)", key=f"data_fim_{key_processos}_{idx}")
+
+                            st.markdown("### ✉️ Resposta aos Quesitos")
+                            quesitos = st.text_area("Transcreva ou cole aqui as respostas aos quesitos", value=processo.get("quesitos", ""), key=f"quesitos_{key_processos}_{idx}")
+
+                            st.markdown("### 📝 Conclusão")
+                            conclusao = st.text_area("Conclusão do perito com base nos dados acima", value=processo.get("conclusao", ""), key=f"conclusao_{key_processos}_{idx}")
+
+                            if st.button("💾 Salvar Laudo", key=f"salvar_laudo_{key_processos}_{idx}"):
+                                processo["nome"] = nome
+                                processo["profissao"] = profissao
+                                processo["cid"] = cid
+                                processo["anamnese"] = anamnese
+                                processo["exame_fisico"] = exame_fisico
+                                processo["documentos"] = documentos
+                                processo["incapacidade"] = incapacidade
+                                processo["data_inicio"] = str(data_inicio)
+                                processo["data_fim"] = str(data_fim)
+                                processo["quesitos"] = quesitos
+                                processo["conclusao"] = conclusao
+                                st.success("Laudo salvo com sucesso.")
+
+                with col_b:
+                    if st.button("🚫", key=f"ausente_{key_processos}_{idx}"):
+                        st.session_state.confirm_action = ("ausencia", key_processos, processo)
+                        st.rerun()
+
+                with col_c:
+                    if st.button("🗑️", key=f"excluir_{key_processos}_{idx}"):
+                        st.session_state.confirm_action = ("excluir", key_processos, processo)
+                        st.rerun()
 
         # Opções de edição (mantido se necessário)
         if has_permission(st.session_state.user_info, 'editar_pericias'):
