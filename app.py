@@ -5,12 +5,6 @@ import sys
 import os
 sys.path.append(os.path.join(os.path.dirname(__file__), 'pages'))
 import streamlit as st
-# from configuracoes import exibir_configuracoes
-try:
-    from configuracoes import exibir_configuracoes
-except ImportError:
-    def exibir_configuracoes():
-        st.error("Erro ao carregar configurações. Verifique se o arquivo 'configuracoes.py' está presente.")
 try:
     from configuracoes import gerenciar_configuracoes
 except ImportError:
@@ -1002,7 +996,7 @@ def main():
             else:
                 _menu = globals().get('menu_selecionado', '')
             if _menu.strip() == "⚙️ Configurações":
-                exibir_configuracoes()
+                gerenciar_configuracoes()
 
 def editar_laudo_ad(processo):
     """Renderiza a tela de redação do laudo AD em duas colunas, com informações do periciando à esquerda."""
