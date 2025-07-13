@@ -1434,11 +1434,39 @@ def editar_laudo_ad(processo):
             exame_fisico or "", height=120, key="exame_fisico"
         )
 
-        st.markdown("### 📁 Documentos Apresentados")
-        st.text_area(
-            "Laudos, exames e atestados apresentados",
-            documentos_texto or "", height=80, key="documentos"
-        )
+        # === NOVA SEÇÃO DE PATOLOGIA ===
+        st.markdown("### 🩺 Patologia")
+
+        if "patologias" not in st.session_state:
+            # Inicializar com processo, se houver
+            st.session_state.patologias = list(processo.get("patologias", [])) if processo.get("patologias") else []
+
+        if "patologias_disponiveis" not in st.session_state:
+            st.session_state.patologias_disponiveis = [
+                "Transtorno de disco intervertebral (CID M51)",
+                "Lombalgia (CID M54)",
+                "Artrose de joelho (CID M17)",
+                "Depressão (CID F32)",
+                "Outros"
+            ]
+
+        # Listar patologias atuais
+        for i, pat in enumerate(st.session_state.patologias):
+            colp1, colp2 = st.columns([8, 1])
+            with colp1:
+                st.write(f"- {pat}")
+            with colp2:
+                if st.button("❌", key=f"del_pat_{i}"):
+                    st.session_state.patologias.pop(i)
+                    st.experimental_rerun()
+
+        selected_pat = st.selectbox("Adicionar nova patologia", st.session_state.patologias_disponiveis)
+        if st.button("Adicionar Patologia"):
+            if selected_pat and selected_pat not in st.session_state.patologias:
+                st.session_state.patologias.append(selected_pat)
+                st.experimental_rerun()
+
+        # === FIM DA SEÇÃO DE PATOLOGIA ===
 
         st.markdown("### 📆 Incapacidade")
         incapacidade_opcoes = ["Sim", "Não", "Parcial", "Permanente"]
