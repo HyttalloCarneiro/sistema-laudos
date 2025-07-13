@@ -581,7 +581,10 @@ def show_processos_view(data_iso, local_name):
             # Utiliza a função de lote de pré-laudos do laudos_ad.py
             for processo in processos_ordenados:
                 if processo.get("tipo") == "AD":
-                    gerar_laudo_ad(processo)
+                    gerar_laudo_ad(processo=processo)
+                    processo["status"] = "Pronto"
+                    if "pdf_path" in processo and os.path.exists(processo["pdf_path"]):
+                        os.remove(processo["pdf_path"])
             st.success("✅ Lote de pré-laudos gerado com sucesso!")
             st.rerun()
 
