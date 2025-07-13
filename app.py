@@ -1366,8 +1366,39 @@ def editar_laudo_ad(processo):
         else:
             st.markdown("- Nenhum benefício anterior informado")
         st.divider()
-        foto = st.file_uploader("📸 Foto 3x4 do periciando", type=["jpg", "jpeg", "png"])
-        documentos = st.file_uploader("📎 Documentos médicos apresentados", type=["jpg", "jpeg", "png"], accept_multiple_files=True)
+        # Renderizar as caixas de upload lado a lado, mais quadradas e alinhadas
+        col_foto, col_docs = st.columns(2)
+        with col_foto:
+            st.markdown(
+                "<div style='margin-bottom:6px;'><b>📸 Foto 3x4 do periciando</b></div>",
+                unsafe_allow_html=True,
+                help="Foto tirada no dia da perícia"
+            )
+            st.markdown(
+                "<style>div[data-testid='stFileUploader']{min-width:150px;min-height:150px;max-width:220px;max-height:220px; margin-bottom: 12px;}</style>",
+                unsafe_allow_html=True
+            )
+            foto_periciando = st.file_uploader(
+                "Arraste ou selecione a foto",
+                type=["jpg", "jpeg", "png"],
+                key="foto_periciando"
+            )
+        with col_docs:
+            st.markdown(
+                "<div style='margin-bottom:6px;'><b>🗂️ Documentos médicos apresentados</b></div>",
+                unsafe_allow_html=True,
+                help="Arquivos entregues no dia"
+            )
+            st.markdown(
+                "<style>div[data-testid='stFileUploader']{min-width:150px;min-height:150px;max-width:220px;max-height:220px; margin-bottom: 12px;}</style>",
+                unsafe_allow_html=True
+            )
+            documentos_medicos = st.file_uploader(
+                "Arraste ou selecione os arquivos",
+                type=["jpg", "jpeg", "png"],
+                accept_multiple_files=True,
+                key="documentos_medicos"
+            )
     with col_dir:
         # Campos principais do laudo (mantendo campos editáveis)
         profissao = processo.get("profissao", "")
