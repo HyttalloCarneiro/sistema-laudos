@@ -580,7 +580,7 @@ def show_processos_view(data_iso, local_name):
         if st.button("🛠️ Gerar Lote de Pré-Laudos"):
             # Utiliza a função de lote de pré-laudos do laudos_ad.py
             for processo in processos_ordenados:
-                gerar_laudo_ad(processo)
+                gerar_laudo_ad(processo=processo)
             st.success("✅ Lote de pré-laudos gerado com sucesso!")
             st.rerun()
 
