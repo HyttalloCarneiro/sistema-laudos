@@ -1,11 +1,6 @@
 import sys
 import os
 sys.path.append(os.path.join(os.path.dirname(__file__), "pages"))
-
-import sys
-import os
-
-sys.path.append(os.path.join(os.path.dirname(__file__), 'pages'))
 import streamlit as st
 import fitz  # PyMuPDF
 import pandas as pd
@@ -596,7 +591,8 @@ def main():
     # Tela de login
     if st.session_state.get("pagina") == "redigir_laudo":
         if st.session_state.get("modo_redacao") == "AD":
-            laudos_ad.redigir_laudo_ad()
+            from pages.laudos_ad import redigir_laudo_ad
+            redigir_laudo_ad()
         elif st.session_state.get("modo_redacao") == "BPC":
             from pages.laudos_bpc import redigir_laudo_bpc
             redigir_laudo_bpc(st.session_state.get("processo_atual"))
