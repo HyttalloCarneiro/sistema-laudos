@@ -1244,7 +1244,8 @@ def main():
                                 if key_processos in st.session_state.processos:
                                     del st.session_state.processos[key_processos]
                                 st.success("✅ Perícia removida com sucesso!")
-                                st.rerun()
+                                # Criar lista de opções com datas formatadas
+                                pass  # Removido para evitar erro de execução
                 else:
                     st.info("📭 Nenhuma perícia agendada ainda.")
 
