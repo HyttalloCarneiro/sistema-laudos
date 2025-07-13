@@ -5,6 +5,8 @@ import sys
 import os
 sys.path.append(os.path.join(os.path.dirname(__file__), 'pages'))
 import streamlit as st
+from configuracoes import gerenciar_configuracoes
+from configuracoes import exibir_configuracoes
 import fitz  # PyMuPDF
 import pandas as pd
 import calendar
@@ -800,47 +802,7 @@ def main():
                 show_processos_view(data_iso, local_name)
 
         elif hasattr(st.session_state, "pagina") and st.session_state.pagina == "configuracoes":
-            st.subheader("⚙️ Configurações do Sistema")
-
-            aba = st.radio("Escolha uma categoria para gerenciar:", ["Modelos de Exame Clínico", "Modelos de Patologias"])
-
-            if aba == "Modelos de Exame Clínico":
-                st.markdown("### Modelos de Exame Clínico")
-                with st.form("form_exame_clinico"):
-                    novo_modelo = st.text_area("Novo modelo de exame clínico")
-                    submitted = st.form_submit_button("Salvar modelo")
-                    if submitted and novo_modelo.strip():
-                        if "modelos_exame_clinico" not in st.session_state:
-                            st.session_state.modelos_exame_clinico = []
-                        st.session_state.modelos_exame_clinico.append(novo_modelo.strip())
-                        st.success("Modelo salvo com sucesso!")
-
-                if "modelos_exame_clinico" in st.session_state and st.session_state.modelos_exame_clinico:
-                    st.markdown("#### Modelos Salvos")
-                    for i, modelo in enumerate(st.session_state.modelos_exame_clinico):
-                        st.markdown(f"**{i+1}.** {modelo}")
-                        if st.button(f"Excluir modelo {i+1}", key=f"excluir_modelo_{i}"):
-                            st.session_state.modelos_exame_clinico.pop(i)
-                            st.experimental_rerun()
-
-            elif aba == "Modelos de Patologias":
-                st.markdown("### Modelos de Patologias")
-                with st.form("form_patologias"):
-                    nova_patologia = st.text_input("Nova patologia comum")
-                    submitted_pat = st.form_submit_button("Salvar patologia")
-                    if submitted_pat and nova_patologia.strip():
-                        if "modelos_patologias" not in st.session_state:
-                            st.session_state.modelos_patologias = []
-                        st.session_state.modelos_patologias.append(nova_patologia.strip())
-                        st.success("Patologia salva com sucesso!")
-
-                if "modelos_patologias" in st.session_state and st.session_state.modelos_patologias:
-                    st.markdown("#### Patologias Salvas")
-                    for i, pat in enumerate(st.session_state.modelos_patologias):
-                        st.markdown(f"**{i+1}.** {pat}")
-                        if st.button(f"Excluir patologia {i+1}", key=f"excluir_patologia_{i}"):
-                            st.session_state.modelos_patologias.pop(i)
-                            st.experimental_rerun()
+            gerenciar_configuracoes()
 
         elif st.session_state.show_estaduais_management and user_info['role'] == 'administrador':
             # Gerenciamento de locais estaduais
@@ -1026,7 +988,7 @@ def main():
             show_local_specific_view(st.session_state.current_local_filter)
         
         elif "⚙️ Configurações" in menu_selecionado:
-            gerenciar_configuracoes()
+            exibir_configuracoes()
         else:
             st.session_state['pagina'] = 'calendario'
             st.experimental_rerun()
@@ -1351,57 +1313,3 @@ def gerar_laudo_ad(processo):
 
 
 
-
-
-def gerenciar_configuracoes():
-    import streamlit as st
-
-    st.title("⚙️ Configurações")
-    aba = st.radio("Escolha uma aba:", ["Modelos de Exame Clínico", "Modelos de Patologias"], horizontal=True)
-
-    if "modelos_exame" not in st.session_state:
-        st.session_state.modelos_exame = []
-    if "modelos_patologias" not in st.session_state:
-        st.session_state.modelos_patologias = []
-
-    if aba == "Modelos de Exame Clínico":
-        st.subheader("Modelos de Exame Clínico")
-        novo_modelo = st.text_area("Novo modelo de exame clínico:")
-        if st.button("Adicionar Modelo"):
-            if novo_modelo.strip():
-                st.session_state.modelos_exame.append(novo_modelo.strip())
-                st.success("Modelo adicionado com sucesso!")
-
-        for i, modelo in enumerate(st.session_state.modelos_exame):
-            st.text_area(f"Modelo {i + 1}", value=modelo, key=f"exame_{i}")
-            col1, col2 = st.columns(2)
-            with col1:
-                if st.button("Salvar", key=f"salvar_exame_{i}"):
-                    st.session_state.modelos_exame[i] = st.session_state[f"exame_{i}"]
-                    st.success("Modelo atualizado.")
-            with col2:
-                if st.button("Excluir", key=f"excluir_exame_{i}"):
-                    st.session_state.modelos_exame.pop(i)
-                    st.success("Modelo excluído.")
-                    st.experimental_rerun()
-
-    elif aba == "Modelos de Patologias":
-        st.subheader("Modelos de Patologias")
-        nova_patologia = st.text_input("Nova patologia comum:")
-        if st.button("Adicionar Patologia"):
-            if nova_patologia.strip():
-                st.session_state.modelos_patologias.append(nova_patologia.strip())
-                st.success("Patologia adicionada com sucesso!")
-
-        for i, patologia in enumerate(st.session_state.modelos_patologias):
-            st.text_input(f"Patologia {i + 1}", value=patologia, key=f"patologia_{i}")
-            col1, col2 = st.columns(2)
-            with col1:
-                if st.button("Salvar", key=f"salvar_patologia_{i}"):
-                    st.session_state.modelos_patologias[i] = st.session_state[f"patologia_{i}"]
-                    st.success("Patologia atualizada.")
-            with col2:
-                if st.button("Excluir", key=f"excluir_patologia_{i}"):
-                    st.session_state.modelos_patologias.pop(i)
-                    st.success("Patologia excluída.")
-                    st.experimental_rerun()
