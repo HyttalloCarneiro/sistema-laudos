@@ -582,7 +582,7 @@ def show_processos_view(data_iso, local_name):
             for processo in processos_ordenados:
                 if processo.get("tipo") == "AD":
                     st.write("Função gerar_laudo_ad chamada para o processo:", processo)
-                    gerar_laudo_ad(processo=processo)
+                    gerar_laudo_ad(processo)
                     st.success("Laudo gerado com sucesso!")
                     processo["status"] = "Pronto"
                     if "pdf_path" in processo and os.path.exists(processo["pdf_path"]):
