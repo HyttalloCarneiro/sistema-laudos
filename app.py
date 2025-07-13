@@ -800,7 +800,47 @@ def main():
                 show_processos_view(data_iso, local_name)
 
         elif hasattr(st.session_state, "pagina") and st.session_state.pagina == "configuracoes":
-            gerenciar_configuracoes()
+            st.subheader("⚙️ Configurações do Sistema")
+
+            aba = st.radio("Escolha uma categoria para gerenciar:", ["Modelos de Exame Clínico", "Modelos de Patologias"])
+
+            if aba == "Modelos de Exame Clínico":
+                st.markdown("### Modelos de Exame Clínico")
+                with st.form("form_exame_clinico"):
+                    novo_modelo = st.text_area("Novo modelo de exame clínico")
+                    submitted = st.form_submit_button("Salvar modelo")
+                    if submitted and novo_modelo.strip():
+                        if "modelos_exame_clinico" not in st.session_state:
+                            st.session_state.modelos_exame_clinico = []
+                        st.session_state.modelos_exame_clinico.append(novo_modelo.strip())
+                        st.success("Modelo salvo com sucesso!")
+
+                if "modelos_exame_clinico" in st.session_state and st.session_state.modelos_exame_clinico:
+                    st.markdown("#### Modelos Salvos")
+                    for i, modelo in enumerate(st.session_state.modelos_exame_clinico):
+                        st.markdown(f"**{i+1}.** {modelo}")
+                        if st.button(f"Excluir modelo {i+1}", key=f"excluir_modelo_{i}"):
+                            st.session_state.modelos_exame_clinico.pop(i)
+                            st.experimental_rerun()
+
+            elif aba == "Modelos de Patologias":
+                st.markdown("### Modelos de Patologias")
+                with st.form("form_patologias"):
+                    nova_patologia = st.text_input("Nova patologia comum")
+                    submitted_pat = st.form_submit_button("Salvar patologia")
+                    if submitted_pat and nova_patologia.strip():
+                        if "modelos_patologias" not in st.session_state:
+                            st.session_state.modelos_patologias = []
+                        st.session_state.modelos_patologias.append(nova_patologia.strip())
+                        st.success("Patologia salva com sucesso!")
+
+                if "modelos_patologias" in st.session_state and st.session_state.modelos_patologias:
+                    st.markdown("#### Patologias Salvas")
+                    for i, pat in enumerate(st.session_state.modelos_patologias):
+                        st.markdown(f"**{i+1}.** {pat}")
+                        if st.button(f"Excluir patologia {i+1}", key=f"excluir_patologia_{i}"):
+                            st.session_state.modelos_patologias.pop(i)
+                            st.experimental_rerun()
 
         elif st.session_state.show_estaduais_management and user_info['role'] == 'administrador':
             # Gerenciamento de locais estaduais
@@ -986,8 +1026,47 @@ def main():
             show_local_specific_view(st.session_state.current_local_filter)
         
         elif menu_selecionado.strip() == "⚙️ Configurações":
-            st.subheader("Configurações")
-            st.info("Área em construção: aqui você poderá gerenciar modelos de exame clínico e patologias mais usuais.")
+            st.subheader("⚙️ Configurações do Sistema")
+
+            aba = st.radio("Escolha uma categoria para gerenciar:", ["Modelos de Exame Clínico", "Modelos de Patologias"])
+
+            if aba == "Modelos de Exame Clínico":
+                st.markdown("### Modelos de Exame Clínico")
+                with st.form("form_exame_clinico"):
+                    novo_modelo = st.text_area("Novo modelo de exame clínico")
+                    submitted = st.form_submit_button("Salvar modelo")
+                    if submitted and novo_modelo.strip():
+                        if "modelos_exame_clinico" not in st.session_state:
+                            st.session_state.modelos_exame_clinico = []
+                        st.session_state.modelos_exame_clinico.append(novo_modelo.strip())
+                        st.success("Modelo salvo com sucesso!")
+
+                if "modelos_exame_clinico" in st.session_state and st.session_state.modelos_exame_clinico:
+                    st.markdown("#### Modelos Salvos")
+                    for i, modelo in enumerate(st.session_state.modelos_exame_clinico):
+                        st.markdown(f"**{i+1}.** {modelo}")
+                        if st.button(f"Excluir modelo {i+1}", key=f"excluir_modelo_{i}"):
+                            st.session_state.modelos_exame_clinico.pop(i)
+                            st.experimental_rerun()
+
+            elif aba == "Modelos de Patologias":
+                st.markdown("### Modelos de Patologias")
+                with st.form("form_patologias"):
+                    nova_patologia = st.text_input("Nova patologia comum")
+                    submitted_pat = st.form_submit_button("Salvar patologia")
+                    if submitted_pat and nova_patologia.strip():
+                        if "modelos_patologias" not in st.session_state:
+                            st.session_state.modelos_patologias = []
+                        st.session_state.modelos_patologias.append(nova_patologia.strip())
+                        st.success("Patologia salva com sucesso!")
+
+                if "modelos_patologias" in st.session_state and st.session_state.modelos_patologias:
+                    st.markdown("#### Patologias Salvas")
+                    for i, pat in enumerate(st.session_state.modelos_patologias):
+                        st.markdown(f"**{i+1}.** {pat}")
+                        if st.button(f"Excluir patologia {i+1}", key=f"excluir_patologia_{i}"):
+                            st.session_state.modelos_patologias.pop(i)
+                            st.experimental_rerun()
         else:
             # Interface principal - calendário
             tab1, tab2 = st.tabs(["📅 Calendário e Perícias", "📋 Gerenciar Perícias"])
@@ -1595,40 +1674,3 @@ def gerar_laudo_ad(processo):
 
 
 
-
-# Definição da função gerenciar_configuracoes conforme solicitado:
-def gerenciar_configuracoes():
-    st.markdown("## ⚙️ Configurações")
-
-    aba = st.selectbox("Escolha o que deseja gerenciar:", ["Modelos de exame clínico", "Modelos de patologias"])
-
-    if aba == "Modelos de exame clínico":
-        st.subheader("Modelos de exame clínico")
-
-        if "modelos_exame_clinico" not in st.session_state:
-            st.session_state.modelos_exame_clinico = {}
-
-        nome_modelo = st.text_input("Nome do modelo")
-        conteudo_modelo = st.text_area("Conteúdo do modelo")
-
-        col1, col2 = st.columns(2)
-        with col1:
-            if st.button("Salvar modelo"):
-                if nome_modelo and conteudo_modelo:
-                    st.session_state.modelos_exame_clinico[nome_modelo] = conteudo_modelo
-                    st.success(f"Modelo '{nome_modelo}' salvo com sucesso.")
-        with col2:
-            if st.button("Excluir modelo"):
-                if nome_modelo in st.session_state.modelos_exame_clinico:
-                    del st.session_state.modelos_exame_clinico[nome_modelo]
-                    st.success(f"Modelo '{nome_modelo}' excluído com sucesso.")
-
-        if st.session_state.modelos_exame_clinico:
-            st.markdown("### Modelos cadastrados:")
-            for nome, conteudo in st.session_state.modelos_exame_clinico.items():
-                with st.expander(nome):
-                    st.write(conteudo)
-
-    elif aba == "Modelos de patologias":
-        st.subheader("Modelos de patologias (ainda não implementado)")
-        st.info("Essa funcionalidade será implementada em breve.")
