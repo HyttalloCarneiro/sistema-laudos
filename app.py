@@ -1272,58 +1272,117 @@ def editar_laudo_ad(processo):
         layout="wide",
         initial_sidebar_state="collapsed"
     )
-    st.markdown("# ✍️ Redação do Laudo - Auxílio Doença (AD)")
+    # Preparar variáveis para o título formatado
+    tipo = processo.get("tipo", "AD")
+    data_str = processo.get("data", processo.get("data_pericia", None))
+    hora = processo.get("horario", "")
+    # data_str pode estar em vários campos, tentar obter da chave do processo se necessário
+    if not data_str:
+        # Tentar extrair da chave do processo, se possível
+        if "key_processos" in processo:
+            data_str = processo["key_processos"].split("_")[0]
+    # Converter data para objeto date, se necessário
+    data = None
+    if isinstance(data_str, date):
+        data = data_str
+    elif isinstance(data_str, str):
+        try:
+            data = datetime.strptime(data_str, "%Y-%m-%d").date()
+        except Exception:
+            try:
+                data = datetime.strptime(data_str, "%d-%m-%Y").date()
+            except Exception:
+                data = None
+    # Título formatado
+    if data:
+        st.markdown(f"### 📝 {tipo} - {data.isoformat()} - {hora}")
+    else:
+        st.markdown(f"### 📝 {tipo} - {hora}")
     st.markdown("---")
     # Botão para voltar
     if st.button("⬅️ Voltar para Processos do Dia"):
         st.session_state.view = "processos"
         st.rerun()
 
+    # Reorganização dos campos conforme solicitado
+    nome = processo.get("nome", processo.get("nome_parte", ""))
+    profissao = processo.get("profissao", "")
+    data_nascimento = processo.get("data_nascimento", "")
+    # Se data_nascimento estiver como date, converter para string
+    if isinstance(data_nascimento, date):
+        data_nascimento = data_nascimento.strftime("%d/%m/%Y")
+    elif isinstance(data_nascimento, str) and len(data_nascimento) == 10 and data_nascimento[4] == "-":
+        # Converter de YYYY-MM-DD para DD/MM/YYYY
+        try:
+            data_nascimento = datetime.strptime(data_nascimento, "%Y-%m-%d").strftime("%d/%m/%Y")
+        except Exception:
+            pass
+    cids = processo.get("cid", "")
+
+    # Primeira linha: nome e profissão
     col1, col2 = st.columns(2)
     with col1:
-        nome = st.text_input("Nome do Periciando", value=processo.get("nome", processo.get("nome_parte", "")))
-        data_nascimento = st.date_input("Data de nascimento", value=processo.get("data_nascimento", date.today()))
-
+        st.text_input("Nome do Periciante", nome, disabled=True)
     with col2:
-        profissao = st.text_input("Profissão", value=processo.get("profissao", ""))
-        cid = st.text_input("CID(s) relacionado(s)", value=processo.get("cid", ""))
+        st.text_input("Profissão", profissao or "")
+    # Segunda linha: data de nascimento e CIDs
+    col1, col2 = st.columns(2)
+    with col1:
+        st.text_input("Data de nascimento", data_nascimento, disabled=True)
+    with col2:
+        st.text_input("CID(s) relacionado(s)", cids or "")
 
+    # Anamnese
+    anamnese = processo.get("anamnese", "")
     st.markdown("### 🩺 Anamnese")
-    anamnese = st.text_area("Descreva os dados clínicos e históricos relevantes", value=processo.get("anamnese", ""))
+    st.text_area(
+        "Descreva os dados clínicos e históricos relevantes mencionados no processo judicial e declarados pelo periciado",
+        anamnese or "", height=150
+    )
 
+    # Exame Físico
+    exame_fisico = processo.get("exame_fisico", "")
     st.markdown("### 🧪 Exame Físico")
-    exame_fisico = st.text_area("Resultado do exame físico realizado", value=processo.get("exame_fisico", ""))
+    st.text_area(
+        "Descreva os achados objetivos da avaliação física presencial realizada durante a perícia",
+        exame_fisico or "", height=150
+    )
 
-    st.markdown("### 📁 Documentos Apresentados")
-    documentos = st.text_area("Laudos, exames e atestados apresentados", value=processo.get("documentos", ""))
+    # Informações Complementares
+    st.markdown("### 📄 Informações Complementares")
+    data_inicio = processo.get("data_inicio", None)
+    previsao = processo.get("previsao", None)
+    # Ajustar data_inicio/previsao para objeto date
+    def parse_date_field(field):
+        if isinstance(field, date):
+            return field
+        elif isinstance(field, str) and field:
+            try:
+                return datetime.strptime(field, "%Y-%m-%d").date()
+            except Exception:
+                try:
+                    return datetime.strptime(field, "%d-%m-%Y").date()
+                except Exception:
+                    return None
+        return None
+    data_inicio = parse_date_field(data_inicio)
+    previsao = parse_date_field(previsao)
+    col1, col2 = st.columns(2)
+    with col1:
+        st.date_input("Data de Início da Incapacidade (se houver)", data_inicio or None)
+    with col2:
+        st.date_input("Previsão de Recuperação (se aplicável)", previsao or None)
+    observacoes = processo.get("observacoes", "")
+    st.text_area("Observações adicionais", observacoes or "", height=100)
 
-    st.markdown("### 📆 Incapacidade")
-    incapacidade = st.selectbox("Houve incapacidade laboral?", ["Sim", "Não", "Parcial", "Permanente"], index=["Sim", "Não", "Parcial", "Permanente"].index(processo.get("incapacidade", "Sim")) if processo.get("incapacidade") in ["Sim", "Não", "Parcial", "Permanente"] else 0)
-    data_inicio = st.date_input("Data de início da incapacidade (se houver)", value=processo.get("data_inicio", date.today()))
-    data_fim = st.date_input("Data provável de término (se houver)", value=processo.get("data_fim", date.today()))
-
-    st.markdown("### ✉️ Resposta aos Quesitos")
-    quesitos = st.text_area("Transcreva ou cole aqui as respostas aos quesitos", value=processo.get("quesitos", ""))
-
-    st.markdown("### 📝 Conclusão")
-    conclusao = st.text_area("Conclusão do perito com base nos dados acima", value=processo.get("conclusao", ""))
-
-    if st.button("💾 Salvar Laudo"):
-        processo["nome"] = nome
-        processo["data_nascimento"] = str(data_nascimento)
-        processo["profissao"] = profissao
-        processo["cid"] = cid
-        processo["anamnese"] = anamnese
-        processo["exame_fisico"] = exame_fisico
-        processo["documentos"] = documentos
-        processo["incapacidade"] = incapacidade
-        processo["data_inicio"] = str(data_inicio)
-        processo["data_fim"] = str(data_fim)
-        processo["quesitos"] = quesitos
-        processo["conclusao"] = conclusao
-        st.success("Laudo salvo com sucesso.")
-        st.session_state.view = "processos"
-        st.rerun()
+    # Botões finais
+    col1, col2, col3 = st.columns([1,1,2])
+    with col1:
+        st.button("🔙 Voltar")
+    with col2:
+        st.button("💾 Salvar e continuar depois")
+    with col3:
+        st.button("🧾 Finalizar e Gerar Laudo")
 
 
 if __name__ == "__main__":
