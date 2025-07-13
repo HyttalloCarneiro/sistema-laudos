@@ -1435,13 +1435,14 @@ def editar_laudo_ad(processo):
             height=150
         )
         # Adiciona rótulo abaixo da caixa de texto
-        st.markdown("**Escolha um modelo**")
+        # Localiza a seção do rótulo "Escolha um modelo" e substitui pelo markdown customizado
+        st.markdown('<p style="font-size: 14px; margin-bottom: 4px;">Escolha um modelo</p>', unsafe_allow_html=True)
         modelos_exame_clinico = {
             "Dor lombar (Lombalgia)": "Paciente apresenta dor à palpação em região lombossacral, com rigidez matinal e leve limitação à flexão lombar. Teste de Lasègue negativo. Marcha preservada.",
             "Transtorno depressivo (Depressão)": "Paciente relata humor deprimido, anedonia, distúrbios de sono e apetite. Apresenta-se orientado, mas com lentificação psicomotora e olhar cabisbaixo. Não há sinais psicóticos.",
             "Artrose de joelho": "Paciente deambula com claudicação leve. Dor à palpação em interlinha articular medial de joelho direito, com crepitação e limitação na extensão. Sem sinais flogísticos."
         }
-        # Selectbox de modelos, largura reduzida à metade
+        # Selectbox de modelos, largura reduzida à metade e espaçamento correto
         col_mod, _ = st.columns([1,1])
         with col_mod:
             modelo_selecionado = st.selectbox(
